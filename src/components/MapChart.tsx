@@ -1,8 +1,9 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { ComposableMap, Geographies, Geography } from "react-simple-maps";
-import { Box, Text, Center, Loader } from "@mantine/core";
+import { Box, Text, Center, Loader, Button, Group } from "@mantine/core";
 import { feature as topoFeature } from "topojson-client";
+import { getCentroid, estimateScaleFromBounds, getBounds } from "../lib/mapUtils";
 
 const localGeo = "/features.json"; // local demo file in public/
 
@@ -11,6 +12,8 @@ export default function MapChart() {
   const [geoData, setGeoData] = useState<unknown | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [projCenter, setProjCenter] = useState<[number, number] | null>(null);
+  const [projScale, setProjScale] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     let mounted = true;
@@ -64,21 +67,48 @@ export default function MapChart() {
         <Text c="red">There was a problem when fetching the map data: {error}</Text>
       </Box>
     );
+  function handleCountryClick(geo: any) {
+    try {
+      const center = getCentroid(geo);
+      const bounds = getBounds(geo);
+      const scale = estimateScaleFromBounds(bounds);
+      setProjCenter(center);
+      setProjScale(scale);
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  function resetZoom() {
+    setProjCenter(null);
+    setProjScale(undefined);
+  }
 
   return (
     <Box style={{ width: "100%", maxWidth: 900, margin: "0 auto" }}>
-      <ComposableMap width={900} height={450} projectionConfig={{ scale: 140 }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+        <Button onClick={resetZoom} size="xs">
+          Reset zoom
+        </Button>
+      </div>
+
+      <ComposableMap
+        width={900}
+        height={450}
+        projectionConfig={{ ...(projCenter ? { center: projCenter } : {}), scale: projScale ?? 140 }}
+      >
         <Geographies geography={geoData as Record<string, unknown>}>
           {({ geographies }: { geographies: Array<Record<string, unknown>> }) =>
-            geographies.map((geo: Record<string, unknown>, i: number) => {
+            geographies.map((geo: any, i: number) => {
               const rsmKey = (geo as { rsmKey?: string }).rsmKey ?? i;
               return (
                 <Geography
                   key={String(rsmKey)}
-                  geography={geo as Record<string, unknown>}
+                  geography={geo}
+                  onClick={() => handleCountryClick(geo)}
                   style={{
-                    default: { outline: "none", fill: "#E6E6E6", stroke: "#DDD" },
-                    hover: { fill: "#8ED1C6", outline: "none" },
+                    default: { outline: "none", fill: "#E6E6E6", stroke: "#DDD", cursor: "pointer" },
+                    hover: { fill: "#8ED1C6", outline: "none", cursor: "pointer" },
                     pressed: { outline: "none" },
                   }}
                 />
