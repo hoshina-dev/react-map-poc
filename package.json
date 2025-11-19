@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "npx next typegen && next lint"
+    "lint": "npx next typegen && next lint",
+    "setup": "node scripts/verify-setup.js",
+    "setup:data": "node scripts/download-admin-data.js && node scripts/setup-admin-boundaries.js"
   },
   "dependencies": {
     "@mantine/core": "8.3.8",
