@@ -64,15 +64,7 @@ This project uses geographic data from [Natural Earth](https://www.naturalearthd
 
 ### Quick Setup (2 commands)
 
-```bash
-# Step 1: Download and extract the data (one-time setup)
-node scripts/download-admin-data.js
-
-# Step 2: Process shapefile into country-specific TopoJSON files
-node scripts/setup-admin-boundaries.js
-```
-
-Or use the npm script:
+use the npm script:
 
 ```bash
 npm run setup:data
@@ -80,6 +72,15 @@ npm run setup:data
 
 > **Note:** The download script for the ZIP file is currently broken. Please download the file manually from [this link](https://www.naturalearthdata.com/download/10m/cultural/ne_10m_admin_1_states_provinces.zip) and place it in the `raw/` directory before running `npm run setup:data`.
 
+Or this, but it is broken right now so dont.
+
+```bash
+# Step 1: Download and extract the data (one-time setup) 
+node scripts/download-admin-data.js
+
+# Step 2: Process shapefile into country-specific TopoJSON files
+node scripts/setup-admin-boundaries.js
+```
 
 **Verify your setup:**
 
@@ -87,12 +88,12 @@ npm run setup:data
 npm run setup
 ```
 
+
 That's it! This will:
 1. Download `ne_10m_admin_1_states_provinces.zip` (~31 MB) from Natural Earth
 2. Extract the shapefile to `raw/ne_10m_admin_1_states_provinces/`
 3. Convert shapefile directly to TopoJSON (skips intermediate GeoJSON)
 4. Split into 252 country files in `public/geo/admin-by-country/`
-5. Clean up temporary files
 
 ### Manual Setup (if scripts fail)
 
