@@ -70,7 +70,7 @@ use the npm script:
 npm run setup:data
 ```
 
-> **Note:** The download script for the ZIP file is currently broken. Please download the file manually from [this link](https://www.naturalearthdata.com/download/10m/cultural/ne_10m_admin_1_states_provinces.zip) and place it in the `raw/` directory before running `npm run setup:data`.
+> **Note:** The download script for the ZIP file is currently broken. Please download the file, Download states and provinces (14.22 MB) version 5.1.1, manually from [this link](https://www.naturalearthdata.com/downloads/10m-cultural-vectors/10m-admin-1-states-provinces/) and place it in the `raw/` directory before running `npm run setup:data`.
 
 Or this, but it is broken right now so dont.
 
@@ -90,7 +90,7 @@ npm run setup
 
 
 That's it! This will:
-1. Download `ne_10m_admin_1_states_provinces.zip` (~31 MB) from Natural Earth
+1. Download `ne_10m_admin_1_states_provinces.zip` (14.22 MB) from Natural Earth
 2. Extract the shapefile to `raw/ne_10m_admin_1_states_provinces/`
 3. Convert shapefile directly to TopoJSON (skips intermediate GeoJSON)
 4. Split into 252 country files in `public/geo/admin-by-country/`
