@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { ComposableMap, Geographies, Geography } from "react-simple-maps";
+import { ComposableMap, Geographies, Geography, ZoomableGroup } from "react-simple-maps";
 import { Box, Text, Center, Loader, Button } from "@mantine/core";
 import { getCentroid, estimateScaleFromBounds, getBounds } from "../lib/mapUtils";
 import { loadWorldMap } from "../lib/geoDataService";
@@ -9,8 +9,9 @@ export default function MapChart() {
   const [geoData, setGeoData] = useState<CountriesCollection | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [projCenter, setProjCenter] = useState<[number, number] | null>(null);
-  const [projScale, setProjScale] = useState<number | undefined>(undefined);
+  const [projCenter, setProjCenter] = useState<[number, number]>([0, 0]);
+  const [projScale, setProjScale] = useState<number>(140);
+  const [zoom, setZoom] = useState<number>(1);
 
   useEffect(() => {
     let mounted = true;
@@ -59,16 +60,22 @@ export default function MapChart() {
       const center = getCentroid(geo);
       const bounds = getBounds(geo);
       const scale = estimateScaleFromBounds(bounds);
+      
+      // Calculate zoom factor based on the scale
+      const zoomFactor = scale / 140; // 140 is default world scale
+      
       setProjCenter(center);
       setProjScale(scale);
+      setZoom(zoomFactor);
     } catch (e) {
       // ignore
     }
   }
 
   function resetZoom() {
-    setProjCenter(null);
-    setProjScale(undefined);
+    setProjCenter([0, 0]);
+    setProjScale(140);
+    setZoom(1);
   }
 
   return (
@@ -82,27 +89,38 @@ export default function MapChart() {
       <ComposableMap
         width={900}
         height={450}
-        projectionConfig={{ ...(projCenter ? { center: projCenter } : {}), scale: projScale ?? 140 }}
+        projection="geoMercator"
       >
-        <Geographies geography={geoData}>
-          {({ geographies }: { geographies: Array<Record<string, unknown>> }) =>
-            geographies.map((geo: any, i: number) => {
-              const rsmKey = (geo as { rsmKey?: string }).rsmKey ?? i;
-              return (
-                <Geography
-                  key={String(rsmKey)}
-                  geography={geo}
-                  onClick={() => handleCountryClick(geo)}
-                  style={{
-                    default: { outline: "none", fill: "#E6E6E6", stroke: "#DDD", cursor: "pointer" },
-                    hover: { fill: "#8ED1C6", outline: "none", cursor: "pointer" },
-                    pressed: { outline: "none" },
-                  }}
-                />
-              );
-            })
-          }
-        </Geographies>
+        <ZoomableGroup
+          center={projCenter}
+          zoom={zoom}
+          minZoom={1}
+          maxZoom={20}
+          onMoveEnd={(position) => {
+            setProjCenter(position.coordinates);
+            setZoom(position.zoom);
+          }}
+        >
+          <Geographies geography={geoData}>
+            {({ geographies }: { geographies: Array<Record<string, unknown>> }) =>
+              geographies.map((geo: any, i: number) => {
+                const rsmKey = (geo as { rsmKey?: string }).rsmKey ?? i;
+                return (
+                  <Geography
+                    key={String(rsmKey)}
+                    geography={geo}
+                    onClick={() => handleCountryClick(geo)}
+                    style={{
+                      default: { outline: "none", fill: "#E6E6E6", stroke: "#DDD", cursor: "pointer" },
+                      hover: { fill: "#8ED1C6", outline: "none", cursor: "pointer" },
+                      pressed: { outline: "none" },
+                    }}
+                  />
+                );
+              })
+            }
+          </Geographies>
+        </ZoomableGroup>
       </ComposableMap>
     </Box>
   );

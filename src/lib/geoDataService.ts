@@ -97,21 +97,57 @@ export async function loadWorldMapMedium(): Promise<CountriesCollection> {
 
 /**
  * Loads high-detail TopoJSON for a specific country
- * Falls back to world map if country file doesn't exist
+ * Smart fallback: tries local file first, then filters from world map
  * 
  * @param countryCode - ISO country code (e.g., "US", "FR", "JP")
- * @returns Promise resolving to detailed country data or world fallback
+ * @returns Promise resolving to detailed country data or filtered world data
  */
 export async function loadCountryDetail(countryCode: string): Promise<CountriesCollection> {
   const countryPath = GEO_PATHS.countryDetail(countryCode);
   
   try {
+    // Try to load dedicated country file first
     return await loadAndParseTopoJSON(countryPath);
   } catch (error) {
-    console.warn(`[GeoDataService] Country detail not found for ${countryCode}, using world map`);
-    // Fallback to world map if country file doesn't exist
-    return loadWorldMap();
+    console.warn(`[GeoDataService] Country file not found for ${countryCode}, filtering from world map`);
+    // Smart fallback: filter the country from world map data
+    return filterCountryFromWorld(countryCode);
   }
+}
+
+/**
+ * Filters a single country from the world map data
+ * This is used as a smart fallback when country-specific files don't exist
+ * 
+ * @param countryCode - ISO country code to filter
+ * @returns Promise resolving to filtered collection with just that country
+ */
+export async function filterCountryFromWorld(countryCode: string): Promise<CountriesCollection> {
+  const worldData = await loadWorldMap();
+  const normalizedCode = countryCode.toUpperCase();
+  
+  // Try to match by various ISO codes or name
+  const filtered = worldData.features.filter(feature => {
+    const props = feature.properties as CountryProperties;
+    return (
+      props.iso_a2?.toUpperCase() === normalizedCode ||
+      props.iso_a3?.toUpperCase() === normalizedCode ||
+      props.iso_n3 === normalizedCode ||
+      props.name?.toUpperCase().includes(normalizedCode)
+    );
+  });
+
+  if (filtered.length === 0) {
+    console.warn(`[GeoDataService] No country found matching: ${countryCode}`);
+    return worldData; // Return full world if no match
+  }
+
+  console.log(`[GeoDataService] Filtered ${filtered.length} feature(s) for ${countryCode}`);
+  
+  return {
+    type: 'FeatureCollection',
+    features: filtered,
+  };
 }
 
 /**
@@ -134,4 +170,13 @@ export function getCacheStats() {
       loadedAt: new Date(value.loadedAt).toISOString(),
     })),
   };
+}
+
+/**
+ * Gets a country's ISO codes from a feature
+ * Helper for identifying countries in the map
+ */
+export function getCountryCode(feature: CountryFeature): string | null {
+  const props = feature.properties as CountryProperties;
+  return props.iso_a2 || props.iso_a3 || null;
 }
