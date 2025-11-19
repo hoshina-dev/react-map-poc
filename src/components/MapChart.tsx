@@ -1,19 +1,21 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { ComposableMap, Geographies, Geography, ZoomableGroup } from "react-simple-maps";
-import { Box, Text, Center, Loader, Button } from "@mantine/core";
+import { Box, Text, Center, Loader, Button, Badge, Group } from "@mantine/core";
 import { getCentroid, estimateScaleFromBounds, getBounds } from "../lib/mapUtils";
-import { loadWorldMap, loadCountryDetail, getCountryCode } from "../lib/geoDataService";
+import { loadWorldMap, loadCountryDetail, loadAdminBoundariesForCountry } from "../lib/geoDataService";
+import WorldMapRenderer from "./WorldMapRenderer";
+import AdminBoundariesRenderer from "./AdminBoundariesRenderer";
 
 export default function MapChart() {
   const [geoData, setGeoData] = useState<CountriesCollection | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [projCenter, setProjCenter] = useState<[number, number]>([0, 0]);
-  const [projScale, setProjScale] = useState<number>(140);
   const [zoom, setZoom] = useState<number>(1);
-  const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
+  const [focusedCountry, setFocusedCountry] = useState<string | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [isFocusMode, setIsFocusMode] = useState(false);
+  const [useAdminBoundaries, setUseAdminBoundaries] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -21,9 +23,26 @@ export default function MapChart() {
     async function load() {
       try {
         setLoading(true);
-        const worldData = await loadWorldMap();
+        // Reset focus mode when switching data sources
+        setIsFocusMode(false);
+        setFocusedCountry(null);
+        setProjCenter([0, 0]);
+        setZoom(1);
+        
+        // Always load world map initially - admin boundaries are loaded on-demand per country
+        const path = '/geo/world-110m.json';
+        
+        const response = await fetch(path);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const topoData = await response.json();
+        
+        // Convert TopoJSON to GeoJSON
+        const objectKey = Object.keys(topoData.objects)[0];
+        const { feature } = await import('topojson-client');
+        const geoJSON = feature(topoData, topoData.objects[objectKey]) as CountriesCollection;
+        
         if (mounted) {
-          setGeoData(worldData);
+          setGeoData(geoJSON);
         }
       } catch (err: unknown) {
         if (mounted) {
@@ -38,6 +57,20 @@ export default function MapChart() {
     return () => {
       mounted = false;
     };
+  }, [useAdminBoundaries]);
+
+  // Keyboard controls for zoom
+  useEffect(() => {
+    function handleKeyPress(e: KeyboardEvent) {
+      if (e.key === '+' || e.key === '=') {
+        setZoom(prev => Math.min(prev * 1.2, 20));
+      } else if (e.key === '-' || e.key === '_') {
+        setZoom(prev => Math.max(prev / 1.2, 1));
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
   }, []);
 
   if (loading)
@@ -58,99 +91,130 @@ export default function MapChart() {
   if (!geoData) return null;
 
   async function handleCountryClick(geo: any) {
+    const featureName = geo.properties?.name || geo.properties?.admin;
+    if (!featureName) return;
+
     try {
       const center = getCentroid(geo);
       const bounds = getBounds(geo);
       const scale = estimateScaleFromBounds(bounds);
+      const zoomFactor = scale / 140;
       
-      // Calculate zoom factor based on the scale
-      const zoomFactor = scale / 140; // 140 is default world scale
-      
+      // Enter focus mode
+      setIsFocusMode(true);
+      setFocusedCountry(featureName);
       setProjCenter(center);
-      setProjScale(scale);
       setZoom(zoomFactor);
 
-      // Load detailed TopoJSON when zooming into a country (threshold: zoom > 3)
-      if (zoomFactor > 3) {
-        const countryCode = getCountryCode(geo);
-        if (countryCode && countryCode !== selectedCountry) {
-          setSelectedCountry(countryCode);
-          setLoadingDetail(true);
-          try {
-            const detailData = await loadCountryDetail(countryCode);
-            setGeoData(detailData);
-          } catch (err) {
-            console.warn(`Failed to load detail for ${countryCode}:`, err);
-            // Keep using world data as fallback
-          } finally {
-            setLoadingDetail(false);
+      setLoadingDetail(true);
+      try {
+        if (useAdminBoundaries) {
+          // Load admin boundaries for the specific country
+          const countryName = geo.properties?.admin || featureName;
+          const adminData = await loadAdminBoundariesForCountry(countryName);
+          if (adminData) {
+            setGeoData(adminData);
           }
+        } else {
+          // Load detailed country data in world map mode
+          const detailData = await loadCountryDetail(featureName);
+          setGeoData(detailData);
         }
+      } catch (err) {
+        console.warn(`Failed to load detail for ${featureName}:`, err);
+      } finally {
+        setLoadingDetail(false);
       }
     } catch (e) {
-      // ignore
+      console.error('Error focusing feature:', e);
     }
   }
 
-  async function resetZoom() {
+  async function exitFocusMode() {
+    setIsFocusMode(false);
+    setFocusedCountry(null);
     setProjCenter([0, 0]);
-    setProjScale(140);
     setZoom(1);
-    setSelectedCountry(null);
+    setLoadingDetail(true);
     
-    // Reload world map data
+    // Reload world map when exiting focus
     try {
-      const worldData = await loadWorldMap();
-      setGeoData(worldData);
+      const path = '/geo/world-110m.json';
+      
+      const response = await fetch(path);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const topoData = await response.json();
+      
+      const objectKey = Object.keys(topoData.objects)[0];
+      const { feature } = await import('topojson-client');
+      const geoJSON = feature(topoData, topoData.objects[objectKey]) as CountriesCollection;
+      
+      setGeoData(geoJSON);
     } catch (err) {
-      console.error("Failed to reload world map:", err);
+      console.error("Failed to reload map:", err);
+    } finally {
+      setLoadingDetail(false);
     }
   }
 
   return (
     <Box style={{ width: "100%", maxWidth: 900, margin: "0 auto" }}>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
-        <Button onClick={resetZoom} size="xs">
-          Reset zoom
-        </Button>
-      </div>
+      <Group justify="space-between" mb="sm">
+        <Group gap="xs">
+          {isFocusMode && focusedCountry && (
+            <Badge size="lg" color="blue" variant="filled">
+              Focusing: {focusedCountry}
+            </Badge>
+          )}
+          {loadingDetail && (
+            <Badge size="sm" color="gray" variant="light">
+              Loading details...
+            </Badge>
+          )}
+          <Text size="xs" c="dimmed">
+            Zoom: {zoom.toFixed(1)}x | Use +/- keys to zoom
+          </Text>
+        </Group>
+        <Group gap="xs">
+          <Button 
+            onClick={() => setUseAdminBoundaries(!useAdminBoundaries)} 
+            size="xs" 
+            variant="default"
+            color={useAdminBoundaries ? "green" : "gray"}
+          >
+            {useAdminBoundaries ? "Admin Boundaries (10m)" : "World (110m)"}
+          </Button>
+          {isFocusMode && (
+            <Button onClick={exitFocusMode} size="xs" variant="light">
+              Exit Focus Mode
+            </Button>
+          )}
+        </Group>
+      </Group>
 
-      <ComposableMap
-        width={900}
-        height={450}
-        projection="geoMercator"
-      >
-        <ZoomableGroup
-          center={projCenter}
+      {useAdminBoundaries ? (
+        <AdminBoundariesRenderer
+          geoData={geoData}
+          projCenter={projCenter}
           zoom={zoom}
-          minZoom={1}
-          maxZoom={20}
           onMoveEnd={(position) => {
             setProjCenter(position.coordinates);
             setZoom(position.zoom);
           }}
-        >
-          <Geographies geography={geoData}>
-            {({ geographies }: { geographies: Array<Record<string, unknown>> }) =>
-              geographies.map((geo: any, i: number) => {
-                const rsmKey = (geo as { rsmKey?: string }).rsmKey ?? i;
-                return (
-                  <Geography
-                    key={String(rsmKey)}
-                    geography={geo}
-                    onClick={() => handleCountryClick(geo)}
-                    style={{
-                      default: { outline: "none", fill: "#E6E6E6", stroke: "#DDD", cursor: "pointer" },
-                      hover: { fill: "#8ED1C6", outline: "none", cursor: "pointer" },
-                      pressed: { outline: "none" },
-                    }}
-                  />
-                );
-              })
-            }
-          </Geographies>
-        </ZoomableGroup>
-      </ComposableMap>
+          onFeatureClick={handleCountryClick}
+        />
+      ) : (
+        <WorldMapRenderer
+          geoData={geoData}
+          projCenter={projCenter}
+          zoom={zoom}
+          onMoveEnd={(position) => {
+            setProjCenter(position.coordinates);
+            setZoom(position.zoom);
+          }}
+          onCountryClick={handleCountryClick}
+        />
+      )}
     </Box>
   );
 }

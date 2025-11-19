@@ -42,3 +42,7 @@ next-env.d.ts
 
 scripts/
 raw/
+
+ne_10m_admin_1_states*.*
+
+admin-by-country/

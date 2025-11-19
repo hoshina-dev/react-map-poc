@@ -11,12 +11,31 @@ import { feature } from 'topojson-client';
 const geoCache = new Map<string, GeoDataCacheEntry>();
 
 /**
+ * Mapping from country names to file names
+ */
+const COUNTRY_NAME_TO_FILE: Record<string, string> = {
+  'United States of America': 'usa',
+  'France': 'france',
+  'Japan': 'japan',
+  'Canada': 'canada',
+  'United Kingdom': 'uk',
+  // Add more as needed
+};
+
+/**
  * Base paths for geographic data files
  */
 const GEO_PATHS = {
   worldLow: '/geo/world-110m.json',
   worldMedium: '/geo/world-50m.json',
   countryDetail: (countryCode: string) => `/geo/countries/${countryCode.toLowerCase()}.json`,
+  adminByCountry: (countryName: string) => {
+    // Convert country name to filename format
+    const filename = countryName.toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    return `/geo/admin-by-country/${filename}-admin.json`;
+  },
 } as const;
 
 /**
@@ -99,19 +118,22 @@ export async function loadWorldMapMedium(): Promise<CountriesCollection> {
  * Loads high-detail TopoJSON for a specific country
  * Smart fallback: tries local file first, then filters from world map
  * 
- * @param countryCode - ISO country code (e.g., "US", "FR", "JP")
+ * @param countryIdentifier - Country name or ISO code
  * @returns Promise resolving to detailed country data or filtered world data
  */
-export async function loadCountryDetail(countryCode: string): Promise<CountriesCollection> {
-  const countryPath = GEO_PATHS.countryDetail(countryCode);
+export async function loadCountryDetail(countryIdentifier: string): Promise<CountriesCollection> {
+  // Try to map country name to file name
+  const fileName = COUNTRY_NAME_TO_FILE[countryIdentifier] || countryIdentifier;
+  const countryPath = GEO_PATHS.countryDetail(fileName);
   
   try {
     // Try to load dedicated country file first
+    console.log(`[GeoDataService] Attempting to load country file: ${countryPath}`);
     return await loadAndParseTopoJSON(countryPath);
   } catch (error) {
-    console.warn(`[GeoDataService] Country file not found for ${countryCode}, filtering from world map`);
+    console.warn(`[GeoDataService] Country file not found for ${countryIdentifier}, filtering from world map`);
     // Smart fallback: filter the country from world map data
-    return filterCountryFromWorld(countryCode);
+    return filterCountryFromWorld(countryIdentifier);
   }
 }
 
@@ -179,4 +201,23 @@ export function getCacheStats() {
 export function getCountryCode(feature: CountryFeature): string | null {
   const props = feature.properties as CountryProperties;
   return props.iso_a2 || props.iso_a3 || null;
+}
+
+/**
+ * Loads admin boundaries (states/provinces) for a specific country
+ * Uses the split admin boundary files for efficient loading
+ * 
+ * @param countryName - Name of the country
+ * @returns Promise resolving to admin boundaries for that country, or null if not found
+ */
+export async function loadAdminBoundariesForCountry(countryName: string): Promise<CountriesCollection | null> {
+  const path = GEO_PATHS.adminByCountry(countryName);
+  
+  try {
+    console.log(`[GeoDataService] Loading admin boundaries for: ${countryName}`);
+    return await loadAndParseTopoJSON(path);
+  } catch (error) {
+    console.warn(`[GeoDataService] No admin boundaries found for ${countryName}`);
+    return null;
+  }
 }
