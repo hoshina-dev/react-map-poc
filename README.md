@@ -21,8 +21,9 @@ An interactive world map with admin boundaries (states/provinces) built with Nex
 ### Installation
 
 ```bash
-npm install
+npm install --legacy-peer-deps
 ```
+> **Note:** Due to react simple map dependencies reason, have to either use force or legacy peer deps, i m sorry :)
 
 ### Development
 
