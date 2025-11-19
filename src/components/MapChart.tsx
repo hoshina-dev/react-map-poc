@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import { ComposableMap, Geographies, Geography, ZoomableGroup } from "react-simple-maps";
 import { Box, Text, Center, Loader, Button } from "@mantine/core";
 import { getCentroid, estimateScaleFromBounds, getBounds } from "../lib/mapUtils";
-import { loadWorldMap } from "../lib/geoDataService";
+import { loadWorldMap, loadCountryDetail, getCountryCode } from "../lib/geoDataService";
 
 export default function MapChart() {
   const [geoData, setGeoData] = useState<CountriesCollection | null>(null);
@@ -12,6 +12,8 @@ export default function MapChart() {
   const [projCenter, setProjCenter] = useState<[number, number]>([0, 0]);
   const [projScale, setProjScale] = useState<number>(140);
   const [zoom, setZoom] = useState<number>(1);
+  const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -55,7 +57,7 @@ export default function MapChart() {
 
   if (!geoData) return null;
 
-  function handleCountryClick(geo: any) {
+  async function handleCountryClick(geo: any) {
     try {
       const center = getCentroid(geo);
       const bounds = getBounds(geo);
@@ -67,15 +69,42 @@ export default function MapChart() {
       setProjCenter(center);
       setProjScale(scale);
       setZoom(zoomFactor);
+
+      // Load detailed TopoJSON when zooming into a country (threshold: zoom > 3)
+      if (zoomFactor > 3) {
+        const countryCode = getCountryCode(geo);
+        if (countryCode && countryCode !== selectedCountry) {
+          setSelectedCountry(countryCode);
+          setLoadingDetail(true);
+          try {
+            const detailData = await loadCountryDetail(countryCode);
+            setGeoData(detailData);
+          } catch (err) {
+            console.warn(`Failed to load detail for ${countryCode}:`, err);
+            // Keep using world data as fallback
+          } finally {
+            setLoadingDetail(false);
+          }
+        }
+      }
     } catch (e) {
       // ignore
     }
   }
 
-  function resetZoom() {
+  async function resetZoom() {
     setProjCenter([0, 0]);
     setProjScale(140);
     setZoom(1);
+    setSelectedCountry(null);
+    
+    // Reload world map data
+    try {
+      const worldData = await loadWorldMap();
+      setGeoData(worldData);
+    } catch (err) {
+      console.error("Failed to reload world map:", err);
+    }
   }
 
   return (

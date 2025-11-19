@@ -35,57 +35,57 @@ async function loadAndParseTopoJSON(path: string): Promise<CountriesCollection> 
 
   console.log(`[GeoDataService] Loading: ${path}`);
   
-  try {
-    const response = await fetch(path);
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    const topoData = await response.json();
-
-    // Convert TopoJSON to GeoJSON
-    let geoJSON: CountriesCollection;
-
-    if (topoData.type === 'Topology') {
-      // TopoJSON format - need to convert
-      const objectKeys = Object.keys(topoData.objects || {});
-      if (objectKeys.length === 0) {
-        throw new Error('TopoJSON has no objects');
-      }
-      
-      // Use first object (typically "countries" or "land")
-      const firstObject = topoData.objects[objectKeys[0]];
-      geoJSON = feature(topoData, firstObject) as CountriesCollection;
-    } else if (topoData.type === 'FeatureCollection') {
-      // Already GeoJSON
-      geoJSON = topoData as CountriesCollection;
-    } else {
-      throw new Error(`Unsupported data format: ${topoData.type}`);
-    }
-
-    // Cache the result
-    const cacheEntry: GeoDataCacheEntry = {
-      data: geoJSON,
-      loadedAt: Date.now(),
-      source: path,
-    };
-    geoCache.set(path, cacheEntry);
-
-    console.log(`[GeoDataService] Loaded ${geoJSON.features.length} features from ${path}`);
-    return geoJSON;
-
-  } catch (error) {
-    console.error(`[GeoDataService] Failed to load ${path}:`, error);
-    throw error;
+  const response = await fetch(path);
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
   }
+
+  const topoData = await response.json();
+
+  // Convert TopoJSON to GeoJSON
+  let geoJSON: CountriesCollection;
+
+  if (topoData.type === 'Topology') {
+    // TopoJSON format - need to convert
+    const objectKeys = Object.keys(topoData.objects || {});
+    if (objectKeys.length === 0) {
+      throw new Error('TopoJSON has no objects');
+    }
+    
+    // Use first object (typically "countries" or "land")
+    const firstObject = topoData.objects[objectKeys[0]];
+    geoJSON = feature(topoData, firstObject) as CountriesCollection;
+  } else if (topoData.type === 'FeatureCollection') {
+    // Already GeoJSON
+    geoJSON = topoData as CountriesCollection;
+  } else {
+    throw new Error(`Unsupported data format: ${topoData.type}`);
+  }
+
+  // Cache the result
+  const cacheEntry: GeoDataCacheEntry = {
+    data: geoJSON,
+    loadedAt: Date.now(),
+    source: path,
+  };
+  geoCache.set(path, cacheEntry);
+
+  console.log(`[GeoDataService] Loaded ${geoJSON.features.length} features from ${path}`);
+  return geoJSON;
 }
 
 /**
- * Loads the world base map (low resolution)
+ * Loads the world base map with fallback support
+ * Tries world-110m.json first, falls back to world-50m.json
  * This should be called on initial app load
  */
 export async function loadWorldMap(): Promise<CountriesCollection> {
-  return loadAndParseTopoJSON(GEO_PATHS.worldLow);
+  try {
+    return await loadAndParseTopoJSON(GEO_PATHS.worldLow);
+  } catch (error) {
+    console.warn('[GeoDataService] world-110m.json not found, trying world-50m.json fallback');
+    return loadAndParseTopoJSON(GEO_PATHS.worldMedium);
+  }
 }
 
 /**
