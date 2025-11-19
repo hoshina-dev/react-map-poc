@@ -78,12 +78,6 @@ Or use the npm script:
 npm run setup:data
 ```
 
-You're right, the disclaimer could be made clearer and more polished. Here's a revised version:
-
-```bash
-npm run setup:data
-```
-
 > **Note:** The download script for the ZIP file is currently broken. Please download the file manually from [this link](https://www.naturalearthdata.com/download/10m/cultural/ne_10m_admin_1_states_provinces.zip) and place it in the `raw/` directory before running `npm run setup:data`.
 
 
