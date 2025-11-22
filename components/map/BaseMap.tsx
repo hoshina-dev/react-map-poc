@@ -21,7 +21,7 @@ interface BaseMapProps {
   maxBounds?: [[number, number], [number, number]] | null;
   fitToBounds?: [[number, number], [number, number]] | null;
   style?: React.CSSProperties;
-  mapProvider?: "osm" | "maplibre-demo" | "mapbox";
+  mapProvider?: "osm" | "positron" | "maplibre-demo" | "mapbox";
 }
 
 const DEFAULT_VIEW_STATE: ViewState = {
@@ -43,7 +43,7 @@ export default function BaseMap({
   maxBounds,
   fitToBounds,
   style = { width: "100%", height: "600px" },
-  mapProvider = "osm",
+  mapProvider = "positron",
 }: BaseMapProps) {
   const mapConfig = getMapConfig(mapProvider);
   const mapRef = useRef<MapRef>(null);

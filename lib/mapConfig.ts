@@ -3,7 +3,7 @@
  * Handles different map styles and their coordinate system requirements
  */
 
-export type MapProvider = "osm" | "maplibre-demo" | "mapbox";
+export type MapProvider = "osm" | "positron" | "maplibre-demo" | "mapbox";
 
 export interface MapConfig {
   provider: MapProvider;
@@ -45,9 +45,21 @@ export const MAPLIBRE_DEMO_STYLE =
   "https://demotiles.maplibre.org/style.json";
 
 /**
+ * Carto Positron Style (clean white/light theme)
+ * Used in react-map-gl examples
+ */
+export const CARTO_POSITRON_STYLE =
+  "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";
+
+/**
  * Map provider configurations
  */
 export const MAP_CONFIGS: Record<MapProvider, MapConfig> = {
+  positron: {
+    provider: "positron",
+    style: CARTO_POSITRON_STYLE,
+    requiresCoordinateAdjustment: false,
+  },
   osm: {
     provider: "osm",
     style: OSM_STYLE,
@@ -68,7 +80,7 @@ export const MAP_CONFIGS: Record<MapProvider, MapConfig> = {
 /**
  * Get map configuration by provider
  */
-export function getMapConfig(provider: MapProvider = "osm"): MapConfig {
+export function getMapConfig(provider: MapProvider = "positron"): MapConfig {
   return MAP_CONFIGS[provider];
 }
 
@@ -78,7 +90,7 @@ export function getMapConfig(provider: MapProvider = "osm"): MapConfig {
 export function transformCoordinates(
   lng: number,
   lat: number,
-  provider: MapProvider = "osm",
+  provider: MapProvider = "positron",
 ): [number, number] {
   const config = MAP_CONFIGS[provider];
   

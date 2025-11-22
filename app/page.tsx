@@ -15,7 +15,7 @@ export default function Home() {
       </Flex>
       <Flex direction="column" align="center" gap="xl">
         <Title order={1}>Interactive World Map</Title>
-        <MapContainer />
+        <MapContainer  mapProvider="positron"/>
       </Flex>
     </Container>
   );
