@@ -84,9 +84,11 @@ export default function MapContainer() {
             id: i,
           })),
         };
+        
+        console.log(`[MapContainer] Added IDs to ${featuresWithIds.features.length} features. Sample ID:`, featuresWithIds.features[0]?.id);
 
-        // Calculate bounding box for the country
-        let [minLng, minLat, maxLng, maxLat] = bbox(boundaries);
+        // Calculate bounding box for the country (use featuresWithIds to preserve IDs)
+        let [minLng, minLat, maxLng, maxLat] = bbox(featuresWithIds);
 
         // Handle date line crossing (e.g., US with Alaska)
         // If longitude span > 180°, likely crosses date line
@@ -95,7 +97,7 @@ export default function MapContainer() {
           
           // Filter out features that cross the date line themselves
           // AND features that are far west (Alaska) or far east (Pacific territories)
-          const mainFeatures = boundaries.features.filter(f => {
+          const mainFeatures = featuresWithIds.features.filter(f => {
             try {
               const featureBbox = bbox(f);
               if (!featureBbox) return false;

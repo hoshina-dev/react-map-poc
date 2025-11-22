@@ -41,9 +41,9 @@ export default function MapInfoBar({
             Focused: {focusedCountry}
           </Badge>
         )}
-        {hoveredRegion && (
+        {focusedCountry && (
           <Badge size="md" color="cyan" variant="light">
-            {hoveredRegion}
+            {hoveredRegion || "None"}
           </Badge>
         )}
         {loading && (

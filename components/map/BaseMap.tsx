@@ -5,6 +5,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import Map, { Layer, Source } from "react-map-gl/maplibre";
 import type { MapRef } from "react-map-gl/maplibre";
+import AdminBoundariesLayer from "./AdminBoundariesLayer";
 
 import { getMapConfig } from "@/lib/mapConfig";
 import type { ViewState } from "@/types/map";
@@ -50,9 +51,6 @@ export default function BaseMap({
     ...DEFAULT_VIEW_STATE,
     ...initialViewState,
   });
-  const [hoveredStateId, setHoveredStateId] = useState<string | number | null>(
-    null,
-  );
   const [minZoom, setMinZoom] = useState<number | undefined>(undefined);
   const [isMapMoving, setIsMapMoving] = useState(false);
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -129,22 +127,7 @@ export default function BaseMap({
     }
   }, [focusedCountry, minZoom]);
 
-  // Clean up hover state when exiting focus mode
-  useEffect(() => {
-    if (!mapLoaded) return;
-    
-    if (!focusedCountry && hoveredStateId !== null) {
-      console.log("[BaseMap] Cleaning up hover state on focus exit");
-      const map = mapRef.current?.getMap();
-      if (map) {
-        map.setFeatureState(
-          { source: "admin-boundaries", id: hoveredStateId },
-          { hover: false },
-        );
-      }
-      setHoveredStateId(null);
-    }
-  }, [focusedCountry, hoveredStateId]);
+  // Hover state for admin boundaries is handled by AdminBoundariesLayer
 
   // Set maxBounds on MapLibre instance
   useEffect(() => {
@@ -244,43 +227,8 @@ export default function BaseMap({
       const map = mapRef.current?.getMap();
       if (!map) return;
 
-      if (focusedCountry) {
-        // In focus mode, hover over admin boundaries
-        const features = event.features;
-        if (features && features.length > 0) {
-          const feature = features[0];
-          const stateName = feature.properties?.name;
-
-          if (hoveredStateId !== null && hoveredStateId !== feature.id) {
-            map.setFeatureState(
-              { source: "admin-boundaries", id: hoveredStateId },
-              { hover: false },
-            );
-          }
-
-          if (feature.id) {
-            setHoveredStateId(feature.id);
-            map.setFeatureState(
-              { source: "admin-boundaries", id: feature.id },
-              { hover: true },
-            );
-          }
-
-          onCountryHover(stateName || null);
-          map.getCanvas().style.cursor = "pointer";
-        } else {
-          if (hoveredStateId !== null) {
-            map.setFeatureState(
-              { source: "admin-boundaries", id: hoveredStateId },
-              { hover: false },
-            );
-            setHoveredStateId(null);
-          }
-          onCountryHover(null);
-          map.getCanvas().style.cursor = "";
-        }
-      } else {
-        // Not in focus mode - hover over world countries
+      // Only handle world-country hover here; admin boundary hover handled in AdminBoundariesLayer
+      if (!focusedCountry) {
         const features = event.features;
         if (features && features.length > 0) {
           const feature = features[0];
@@ -293,7 +241,7 @@ export default function BaseMap({
         }
       }
     },
-    [onCountryHover, focusedCountry, hoveredStateId],
+    [onCountryHover, focusedCountry],
   );
 
   const handleMouseLeave = useCallback(() => {
@@ -303,15 +251,8 @@ export default function BaseMap({
     const map = mapRef.current?.getMap();
     if (map) {
       map.getCanvas().style.cursor = "";
-      if (hoveredStateId !== null) {
-        map.setFeatureState(
-          { source: "admin-boundaries", id: hoveredStateId },
-          { hover: false },
-        );
-        setHoveredStateId(null);
-      }
     }
-  }, [onCountryHover, hoveredStateId]);
+  }, [onCountryHover]);
 
   // Log render state
   console.log("[BaseMap] Rendering with:", {
@@ -355,34 +296,11 @@ export default function BaseMap({
         </Source>
       )}
       {focusedCountry && adminBoundaries && (
-        <Source
-          id="admin-boundaries"
-          type="geojson"
-          data={adminBoundaries}
-          promoteId="id"
-        >
-          <Layer
-            id="admin-boundaries-fill"
-            type="fill"
-            paint={{
-              "fill-color": [
-                "case",
-                ["boolean", ["feature-state", "hover"], false],
-                "#4A90E2",
-                "#E6E6E6",
-              ],
-              "fill-opacity": 0.6,
-            }}
-          />
-          <Layer
-            id="admin-boundaries-line"
-            type="line"
-            paint={{
-              "line-color": "#333",
-              "line-width": 1.5,
-            }}
-          />
-        </Source>
+        <AdminBoundariesLayer
+          mapRef={mapRef}
+          adminBoundaries={adminBoundaries}
+          onRegionHover={onCountryHover}
+        />
       )}
     </Map>
   );
