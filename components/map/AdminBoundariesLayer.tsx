@@ -1,88 +1,76 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useMemo } from "react";
 import { Source, Layer } from "react-map-gl/maplibre";
-import type { MapRef } from "react-map-gl/maplibre";
+import type { LayerProps } from "react-map-gl/maplibre";
 
 interface Props {
-  mapRef: React.RefObject<MapRef | null>;
   adminBoundaries: any;
-  onRegionHover?: (name: string | null) => void;
+  hoveredProvince: string | null;
 }
 
-export default function AdminBoundariesLayer({
-  mapRef,
-  adminBoundaries,
-  onRegionHover,
-}: Props) {
-  const [hoveredName, setHoveredName] = useState<string | null>(null);
+// Base layer style for all states/provinces
+const baseLayer: LayerProps = {
+  id: "admin-boundaries-fill",
+  type: "fill",
+  paint: {
+    "fill-color": "#E6E6E6",
+    "fill-opacity": 0.6,
+  },
+};
 
-  useEffect(() => {
-    const map = mapRef.current?.getMap();
-    if (!map || !adminBoundaries) return;
+// Highlight layer style (shown only when hovering)
+const highlightLayer: LayerProps = {
+  id: "admin-boundaries-fill-highlight",
+  type: "fill",
+  paint: {
+    "fill-color": "#4ECDC4",
+    "fill-opacity": 0.8,
+  },
+};
 
-    const handleMouseMove = (e: any) => {
-      const features = e.features;
+// Border layer
+const lineLayer: LayerProps = {
+  id: "admin-boundaries-line",
+  type: "line",
+  paint: {
+    "line-color": "#333",
+    "line-width": 1,
+  },
+};
 
-      if (features && features.length > 0) {
-        const feature = features[0];
-        const id = feature.id;
-        
-        // Extract name and clean up null bytes that may be present in TopoJSON data
-        const rawName = feature.properties?.name ?? feature.properties?.NAME ?? feature.properties?.admin ?? null;
-        const name = rawName ? rawName.replace(/\0+$/, "").trim() : null;
-
-        // Always update hover state and send name up
-        // Use name for highlighting since IDs may not be available
-        setHoveredName(name);
-        onRegionHover?.(name);
-        map.getCanvas().style.cursor = "pointer";
-      } else {
-        setHoveredName(null);
-        onRegionHover?.(null);
-        map.getCanvas().style.cursor = "";
-      }
-    };
-
-    const handleMouseLeave = () => {
-      setHoveredName(null);
-      onRegionHover?.(null);
-      map.getCanvas().style.cursor = "";
-    };
-
-    // Use interactive layer events to limit event handling to this layer
-    map.on("mousemove", "admin-boundaries-fill", handleMouseMove);
-    map.on("mouseleave", "admin-boundaries-fill", handleMouseLeave);
-
-    return () => {
-      map.off("mousemove", "admin-boundaries-fill", handleMouseMove);
-      map.off("mouseleave", "admin-boundaries-fill", handleMouseLeave);
-      setHoveredName(null);
-    };
-  }, [mapRef, adminBoundaries, onRegionHover]);
+const AdminBoundariesLayer = ({ adminBoundaries, hoveredProvince }: Props) => {
+  const filter: ["in", string, string] = useMemo(
+    () => ["in", "name_en", hoveredProvince || ""],
+    [hoveredProvince]
+  );
 
   if (!adminBoundaries) return null;
 
-  return (
-    <Source id="admin-boundaries" type="geojson" data={adminBoundaries} promoteId="id">
-      <Layer id="admin-boundaries-fill" type="fill" paint={{ "fill-color": "#E6E6E6", "fill-opacity": 0.0 }} />
+  console.log(
+    "[AdminBoundariesLayer] Rendering with hoveredProvince:",
+    hoveredProvince,
+    "filter:",
+    filter
+  );
 
-      {/* Highlight layer - only shows the hovered feature via filter */}
+  return (
+    <Source id="admin-boundaries" type="geojson" data={adminBoundaries}>
+      <Layer {...baseLayer} />
       <Layer
         id="admin-boundaries-fill-highlight"
         type="fill"
-        filter={hoveredName !== null ? ["==", ["get", "name"], hoveredName] : ["==", ["get", "name"], "__none__"]}
-        paint={{ "fill-color": "#4ECDC4", "fill-opacity": 0.5 }}
+        paint={{
+          "fill-color": "#4ECDC4",
+          "fill-opacity": 0.8,
+        }}
+        filter={filter}
       />
-
-      <Layer id="admin-boundaries-line" type="line" paint={{ "line-color": "#333", "line-width": 1.2 }} />
-
-      <Layer
-        id="admin-boundaries-line-highlight"
-        type="line"
-        filter={hoveredName !== null ? ["==", ["get", "name"], hoveredName] : ["==", ["get", "name"], "__none__"]}
-        paint={{ "line-color": "#00B4A6", "line-width": 2.5 }}
-      />
+      <Layer {...lineLayer} />
     </Source>
   );
-}
+};
+
+AdminBoundariesLayer.displayName = "AdminBoundariesLayer";
+
+export default AdminBoundariesLayer;

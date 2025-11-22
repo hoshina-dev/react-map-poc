@@ -47,6 +47,7 @@ export default function BaseMap({
 }: BaseMapProps) {
   const mapConfig = getMapConfig(mapProvider);
   const mapRef = useRef<MapRef>(null);
+  const [hoveredProvince, setHoveredProvince] = useState<string | null>(null);
   const [viewState, setViewState] = useState<ViewState>({
     ...DEFAULT_VIEW_STATE,
     ...initialViewState,
@@ -92,7 +93,7 @@ export default function BaseMap({
     
     // When exiting focus mode, force immediate jump to world view
     if (!focusedCountry && map) {
-      console.log("[BaseMap] Exiting focus - forcing jumpTo world view");
+      // console.log("[BaseMap] Exiting focus - forcing jumpTo world view");
       map.jumpTo({
         center: [initialViewState.longitude || 0, initialViewState.latitude || 20],
         zoom: initialViewState.zoom || 2,
@@ -227,8 +228,30 @@ export default function BaseMap({
       const map = mapRef.current?.getMap();
       if (!map) return;
 
-      // Only handle world-country hover here; admin boundary hover handled in AdminBoundariesLayer
-      if (!focusedCountry) {
+      // Handle admin boundary hover when in focus mode
+      if (focusedCountry && adminBoundaries) {
+        const features = event.features;
+        if (features && features.length > 0) {
+          const feature = features[0];
+          // console.log("[BaseMap] Hover feature:", feature.properties);
+          // Use clean name_en property (no null bytes!)
+          const name = feature.properties?.name_en || null;
+
+          if (name) {
+            console.log("[BaseMap] Setting hoveredProvince:", name);
+            setHoveredProvince(name);
+            onCountryHover(name);
+            map.getCanvas().style.cursor = "pointer";
+          }
+        } else {
+          console.log("[BaseMap] No features, clearing filter");
+          setHoveredProvince(null);
+          onCountryHover(null);
+          map.getCanvas().style.cursor = "";
+        }
+      }
+      // Handle world-country hover when not in focus mode
+      else if (!focusedCountry) {
         const features = event.features;
         if (features && features.length > 0) {
           const feature = features[0];
@@ -241,7 +264,7 @@ export default function BaseMap({
         }
       }
     },
-    [onCountryHover, focusedCountry],
+    [onCountryHover, focusedCountry, adminBoundaries],
   );
 
   const handleMouseLeave = useCallback(() => {
@@ -297,9 +320,8 @@ export default function BaseMap({
       )}
       {focusedCountry && adminBoundaries && (
         <AdminBoundariesLayer
-          mapRef={mapRef}
           adminBoundaries={adminBoundaries}
-          onRegionHover={onCountryHover}
+          hoveredProvince={hoveredProvince}
         />
       )}
     </Map>
