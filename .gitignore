@@ -49,3 +49,6 @@ public/geo/admin-by-country/
 # Temporary geographic data files
 public/geo/ne_10m_admin_1_states*.json
 *.geojson
+
+
+old/
