@@ -7,7 +7,7 @@ import {
 } from "@mantine/core";
 import type { Metadata } from "next";
 
-import { theme } from "@/libs/theme";
+import { theme } from "@/lib/theme";
 
 export const metadata: Metadata = {
   title: "Mapfox",
