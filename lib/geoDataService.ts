@@ -4,6 +4,7 @@
  */
 
 import { feature } from "topojson-client";
+import type { Topology, GeometryObject } from "topojson-specification";
 
 import type { GeoJSONFeatureCollection } from "@/types/map";
 
@@ -48,23 +49,35 @@ export async function loadTopoJSON(
     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
   }
 
-  const topoData = await response.json();
+  const topoData: Topology | GeoJSONFeatureCollection = await response.json();
 
   // Convert TopoJSON to GeoJSON
   let geoJSON: GeoJSONFeatureCollection;
 
-  if (topoData.type === "Topology") {
-    const objectKeys = Object.keys(topoData.objects || {});
+  if ("type" in topoData && topoData.type === "Topology") {
+    const topology = topoData as Topology;
+    const objectKeys = Object.keys(topology.objects);
+    
     if (objectKeys.length === 0) {
       throw new Error("TopoJSON has no objects");
     }
 
-    const firstObject = topoData.objects[objectKeys[0]];
-    geoJSON = feature(topoData, firstObject) as GeoJSONFeatureCollection;
-  } else if (topoData.type === "FeatureCollection") {
+    const firstObjectKey = objectKeys[0];
+    if (!firstObjectKey) {
+      throw new Error("No valid object key found in TopoJSON");
+    }
+    
+    const firstObject = topology.objects[firstObjectKey];
+    
+    if (!firstObject) {
+      throw new Error(`TopoJSON object "${firstObjectKey}" is undefined`);
+    }
+    
+    geoJSON = feature(topology, firstObject as GeometryObject) as unknown as GeoJSONFeatureCollection;
+  } else if ("type" in topoData && topoData.type === "FeatureCollection") {
     geoJSON = topoData as GeoJSONFeatureCollection;
   } else {
-    throw new Error(`Unsupported data format: ${topoData.type}`);
+    throw new Error(`Unsupported data format`);
   }
 
   // Cache the result
