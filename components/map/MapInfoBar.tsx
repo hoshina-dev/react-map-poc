@@ -8,6 +8,7 @@ interface MapInfoBarProps {
   hoveredRegion: string | null;
   loading: boolean;
   zoom?: number;
+  currentZoom?: number;
   onExitFocus: () => void;
 }
 
@@ -16,8 +17,11 @@ export default function MapInfoBar({
   hoveredRegion,
   loading,
   zoom,
+  currentZoom,
   onExitFocus,
 }: MapInfoBarProps) {
+  const displayZoom = currentZoom ?? zoom;
+  
   return (
     <Paper
       withBorder
@@ -47,9 +51,9 @@ export default function MapInfoBar({
             Loading...
           </Badge>
         )}
-        {zoom && (
+        {displayZoom && (
           <Text size="xs" c="dimmed">
-            Zoom: {zoom.toFixed(1)}x
+            Zoom: {displayZoom.toFixed(2)}x
           </Text>
         )}
       </Group>

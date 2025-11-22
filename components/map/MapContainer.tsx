@@ -28,7 +28,11 @@ export default function MapContainer() {
   const [maxBounds, setMaxBounds] = useState<
     [[number, number], [number, number]] | null
   >(null);
+  const [fitToBounds, setFitToBounds] = useState<
+    [[number, number], [number, number]] | null
+  >(null);
   const [loading, setLoading] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   // Load world countries for clicking
   useEffect(() => {
@@ -46,18 +50,27 @@ export default function MapContainer() {
 
   // Load admin boundaries when a country is focused
   useEffect(() => {
+    console.log("[MapContainer] Focus effect triggered, focusedCountry:", focusedCountry);
+    
     if (!focusedCountry) {
+      console.log("[MapContainer] No focused country, clearing boundaries");
       setAdminBoundaries(null);
       setMaxBounds(null);
+      setFitToBounds(null);
       return;
     }
 
     async function loadCountryData() {
+      console.log(`[MapContainer] Loading boundaries for: ${focusedCountry}`);
       setLoading(true);
+      
+      // Keep focusedCountry in local variable but don't pass to BaseMap yet
+      const countryToLoad = focusedCountry;
+      
       try {
-        const boundaries = await loadAdminBoundaries(focusedCountry!);
+        const boundaries = await loadAdminBoundaries(countryToLoad!);
         if (!boundaries || !boundaries.features || boundaries.features.length === 0) {
-          console.warn(`No boundaries found for ${focusedCountry}`);
+          console.warn(`No boundaries found for ${countryToLoad}`);
           setFocusedCountry(null);
           setLoading(false);
           return;
@@ -72,15 +85,13 @@ export default function MapContainer() {
           })),
         };
 
-        setAdminBoundaries(featuresWithIds);
-
         // Calculate bounding box for the country
         let [minLng, minLat, maxLng, maxLat] = bbox(boundaries);
 
         // Handle date line crossing (e.g., US with Alaska)
         // If longitude span > 180°, likely crosses date line
         if (maxLng - minLng > 180) {
-          console.log(`${focusedCountry} crosses date line, adjusting bounds`);
+          console.log(`${countryToLoad} crosses date line, adjusting bounds`);
           
           // Filter out features that cross the date line themselves
           // AND features that are far west (Alaska) or far east (Pacific territories)
@@ -122,7 +133,7 @@ export default function MapContainer() {
 
         // Validate bounds
         if (!isFinite(minLng) || !isFinite(maxLng) || !isFinite(minLat) || !isFinite(maxLat)) {
-          console.error(`Invalid bounds for ${focusedCountry}`);
+          console.error(`Invalid bounds for ${countryToLoad}`);
           setFocusedCountry(null);
           setLoading(false);
           return;
@@ -149,58 +160,25 @@ export default function MapContainer() {
           [clampedMaxLng, clampedMaxLat],
         ];
 
+        console.log(`[MapContainer] ${countryToLoad} - Bounds: [${lngDiff.toFixed(2)}° x ${latDiff.toFixed(2)}°]`);
+        console.log(`[MapContainer] All data ready, batching state updates`);
+        
+        // Batch all state updates together - React will batch these automatically
+        setAdminBoundaries(featuresWithIds);
         setMaxBounds(bounds);
-
-        // Calculate center
-        const centerLng = (minLng + maxLng) / 2;
-        const centerLat = (minLat + maxLat) / 2;
-
-        // Validate center coordinates
-        if (!validateCoordinates(centerLng, centerLat)) {
-          console.error(`Invalid center coordinates for ${focusedCountry}: [${centerLng}, ${centerLat}]`);
-          setFocusedCountry(null);
-          setLoading(false);
-          return;
-        }
-
-        // Calculate zoom to fit the country in the container (1200x600)
-        const containerWidth = 1200;
-        const containerHeight = 600;
-
-        // Account for Web Mercator projection distortion at the latitude
-        const latRad = (centerLat * Math.PI) / 180;
-        const adjustedLngDiff = lngDiff / Math.cos(latRad);
-
-        // Calculate zoom level that fits both dimensions with 15% padding
-        const WORLD_DIM = { width: 360, height: 180 };
-        const ZOOM_PADDING = 0.85; // 15% padding
-
-        const zoomLng =
-          Math.log2(
-            (containerWidth * ZOOM_PADDING * WORLD_DIM.width) /
-              (256 * adjustedLngDiff),
-          ) - 1;
-        const zoomLat =
-          Math.log2(
-            (containerHeight * ZOOM_PADDING * WORLD_DIM.height) /
-              (256 * latDiff),
-          ) - 1;
-
-        // Use the smaller zoom to ensure the entire country fits
-        const zoom = Math.max(2, Math.min(Math.floor(Math.min(zoomLng, zoomLat)), 15));
-
-        console.log(`${focusedCountry} - Center: [${centerLng.toFixed(2)}, ${centerLat.toFixed(2)}], Zoom: ${zoom}`);
-
-        setViewState({
-          longitude: centerLng,
-          latitude: centerLat,
-          zoom,
-        });
+        setFitToBounds(bounds);
+        setLoading(false);
+        
+        // Clear transition lock after everything is set
+        setTimeout(() => {
+          console.log(`[MapContainer] Transition complete for ${countryToLoad}`);
+          setIsTransitioning(false);
+        }, 200);
       } catch (error) {
         console.error("Failed to load admin boundaries:", error);
         setFocusedCountry(null);
-      } finally {
         setLoading(false);
+        setIsTransitioning(false);
       }
     }
 
@@ -208,31 +186,65 @@ export default function MapContainer() {
   }, [focusedCountry]);
 
   const handleCountryClick = useCallback((countryName: string) => {
-    // Prevent clicking another country while already in focus mode or loading
-    if (focusedCountry || loading) {
-      console.log("Already in focus mode or loading, ignoring click");
+    // Prevent clicking during transitions, loading, or when already focused
+    if (focusedCountry || loading || isTransitioning) {
+      console.log("Already in focus mode, loading, or transitioning - ignoring click");
       return;
     }
-    setFocusedCountry(countryName);
-  }, [focusedCountry, loading]);
+    console.log("[MapContainer] Country clicked:", countryName);
+    setIsTransitioning(true);
+    
+    // First reset to world view to ensure clean state
+    console.log("[MapContainer] Resetting to world view before loading country");
+    setViewState({ longitude: 0, latitude: 20, zoom: 2 });
+    
+    // Small delay to let map reset, then load country
+    setTimeout(() => {
+      setFocusedCountry(countryName);
+    }, 50);
+  }, [focusedCountry, loading, isTransitioning]);
 
   const handleCountryHover = useCallback((regionName: string | null) => {
     setHoveredRegion(regionName);
   }, []);
 
+  const handleViewStateChange = useCallback((newViewState: ViewState) => {
+    // Only track zoom changes for display, don't update full viewState to prevent loop
+    setViewState((prev) => ({
+      ...prev,
+      zoom: newViewState.zoom,
+    }));
+  }, []);
+
   const exitFocusMode = useCallback(() => {
-    // Clear all focus mode state
+    console.log("[MapContainer] exitFocusMode called");
+    console.log("[MapContainer] Current state:", {
+      focusedCountry,
+      hasAdminBoundaries: !!adminBoundaries,
+      maxBounds,
+      viewState,
+    });
+    
+    // Lock transitions during exit
+    setIsTransitioning(true);
+    
+    // Clear all focus mode state and reset view simultaneously
     setFocusedCountry(null);
     setHoveredRegion(null);
     setAdminBoundaries(null);
     setMaxBounds(null);
+    setFitToBounds(null);
     setLoading(false);
     
-    // Reset to world view with a slight delay to ensure state is cleared
+    console.log("[MapContainer] State cleared, resetting view to world");
+    setViewState({ longitude: 0, latitude: 20, zoom: 2 });
+    
+    // Clear transition lock after zoom out completes
     setTimeout(() => {
-      setViewState({ longitude: 0, latitude: 20, zoom: 2 });
-    }, 0);
-  }, []);
+      console.log("[MapContainer] Exit transition complete");
+      setIsTransitioning(false);
+    }, 300);
+  }, [focusedCountry, adminBoundaries, maxBounds, viewState]);
 
   return (
     <Box style={{ width: "100%", maxWidth: 1200, margin: "0 auto" }}>
@@ -241,6 +253,7 @@ export default function MapContainer() {
         hoveredRegion={hoveredRegion}
         loading={loading}
         zoom={viewState.zoom}
+        currentZoom={viewState.zoom}
         onExitFocus={exitFocusMode}
       />
       
@@ -248,10 +261,12 @@ export default function MapContainer() {
         initialViewState={viewState}
         onCountryClick={handleCountryClick}
         onCountryHover={handleCountryHover}
+        onViewStateChange={handleViewStateChange}
         focusedCountry={focusedCountry}
         adminBoundaries={adminBoundaries}
         worldCountries={worldCountries}
         maxBounds={maxBounds}
+        fitToBounds={fitToBounds}
         style={{ width: "100%", height: "600px", borderRadius: "8px" }}
       />
     </Box>

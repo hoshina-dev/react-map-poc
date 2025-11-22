@@ -13,10 +13,12 @@ interface BaseMapProps {
   initialViewState?: Partial<ViewState>;
   onCountryClick?: (countryName: string) => void;
   onCountryHover?: (countryName: string | null) => void;
+  onViewStateChange?: (viewState: ViewState) => void;
   focusedCountry?: string | null;
   adminBoundaries?: any;
   worldCountries?: any;
   maxBounds?: [[number, number], [number, number]] | null;
+  fitToBounds?: [[number, number], [number, number]] | null;
   style?: React.CSSProperties;
   mapProvider?: "osm" | "maplibre-demo" | "mapbox";
 }
@@ -33,10 +35,12 @@ export default function BaseMap({
   initialViewState,
   onCountryClick,
   onCountryHover,
+  onViewStateChange,
   focusedCountry,
   adminBoundaries,
   worldCountries,
   maxBounds,
+  fitToBounds,
   style = { width: "100%", height: "600px" },
   mapProvider = "osm",
 }: BaseMapProps) {
@@ -50,23 +54,87 @@ export default function BaseMap({
     null,
   );
   const [minZoom, setMinZoom] = useState<number | undefined>(undefined);
+  const [isMapMoving, setIsMapMoving] = useState(false);
+  const [mapLoaded, setMapLoaded] = useState(false);
 
-  // Update view state when initialViewState changes
+  // Track map movement to prevent clicks during animation
   useEffect(() => {
-    if (initialViewState) {
-      setViewState((prev) => ({ ...prev, ...initialViewState }));
-      // Set minZoom to the initial zoom when entering focus mode
-      if (focusedCountry && initialViewState.zoom) {
-        setMinZoom(initialViewState.zoom);
-      } else if (!focusedCountry) {
-        setMinZoom(undefined);
+    if (!mapLoaded) return;
+    
+    const map = mapRef.current?.getMap();
+    if (!map) return;
+
+    const handleMoveStart = () => {
+      console.log("[BaseMap] Map started moving");
+      setIsMapMoving(true);
+    };
+
+    const handleMoveEnd = () => {
+      console.log("[BaseMap] Map stopped moving");
+      setIsMapMoving(false);
+    };
+
+    map.on('movestart', handleMoveStart);
+    map.on('moveend', handleMoveEnd);
+
+    return () => {
+      map.off('movestart', handleMoveStart);
+      map.off('moveend', handleMoveEnd);
+    };
+  }, [mapLoaded]);
+
+  // Update view state when focusedCountry changes (for focus mode transitions)
+  useEffect(() => {
+    if (!mapLoaded) return;
+    
+    console.log("[BaseMap] focusedCountry changed:", focusedCountry, "initialViewState:", initialViewState);
+    if (!initialViewState) return;
+    
+    const map = mapRef.current?.getMap();
+    
+    // When exiting focus mode, force immediate jump to world view
+    if (!focusedCountry && map) {
+      console.log("[BaseMap] Exiting focus - forcing jumpTo world view");
+      map.jumpTo({
+        center: [initialViewState.longitude || 0, initialViewState.latitude || 20],
+        zoom: initialViewState.zoom || 2,
+      });
+    }
+    
+    // Update internal state but don't trigger onViewStateChange to prevent loop
+    setViewState((prev) => ({ ...prev, ...initialViewState }));
+    
+    // Only manage minZoom when entering focus mode, not when exiting
+    if (focusedCountry && initialViewState.zoom) {
+      console.log("[BaseMap] Setting minZoom to:", initialViewState.zoom);
+      setMinZoom(initialViewState.zoom);
+      if (map) {
+        map.setMinZoom(initialViewState.zoom);
       }
     }
-  }, [initialViewState, focusedCountry]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusedCountry, mapLoaded]); // Depend on mapLoaded to ensure map is ready
+
+  // Clear minZoom when exiting focus mode
+  useEffect(() => {
+    if (!mapLoaded) return;
+    
+    if (!focusedCountry && minZoom !== undefined) {
+      console.log("[BaseMap] Exiting focus mode - clearing minZoom");
+      setMinZoom(undefined);
+      const map = mapRef.current?.getMap();
+      if (map) {
+        map.setMinZoom(0); // Reset to no minimum zoom
+      }
+    }
+  }, [focusedCountry, minZoom]);
 
   // Clean up hover state when exiting focus mode
   useEffect(() => {
+    if (!mapLoaded) return;
+    
     if (!focusedCountry && hoveredStateId !== null) {
+      console.log("[BaseMap] Cleaning up hover state on focus exit");
       const map = mapRef.current?.getMap();
       if (map) {
         map.setFeatureState(
@@ -78,13 +146,74 @@ export default function BaseMap({
     }
   }, [focusedCountry, hoveredStateId]);
 
+  // Set maxBounds on MapLibre instance
+  useEffect(() => {
+    if (!mapLoaded) return;
+    
+    console.log("[BaseMap] maxBounds changed:", maxBounds);
+    const map = mapRef.current?.getMap();
+    if (map) {
+      if (maxBounds === null) {
+        console.log("[BaseMap] Explicitly removing maxBounds from map");
+        map.setMaxBounds(undefined);
+      } else {
+        console.log("[BaseMap] Setting maxBounds on map:", maxBounds);
+        map.setMaxBounds(maxBounds);
+      }
+    }
+  }, [maxBounds]);
+
+  // Fit to bounds when entering focus mode
+  useEffect(() => {
+    if (!mapLoaded) return;
+    
+    console.log("[BaseMap] fitToBounds changed:", fitToBounds);
+    const map = mapRef.current?.getMap();
+    if (map && fitToBounds) {
+      console.log("[BaseMap] Current map state before fitBounds:", {
+        center: map.getCenter(),
+        zoom: map.getZoom(),
+      });
+      console.log("[BaseMap] Calling map.fitBounds:", fitToBounds);
+      map.fitBounds(
+        [
+          [fitToBounds[0][0], fitToBounds[0][1]],
+          [fitToBounds[1][0], fitToBounds[1][1]],
+        ],
+        {
+          padding: { top: 50, bottom: 50, left: 50, right: 50 },
+          duration: 0, // No animation
+        }
+      );
+      // Log after fitBounds
+      setTimeout(() => {
+        console.log("[BaseMap] Map state after fitBounds:", {
+          center: map.getCenter(),
+          zoom: map.getZoom(),
+        });
+      }, 50);
+    }
+  }, [fitToBounds]);
+
   const handleMove = useCallback((evt: { viewState: ViewState }) => {
     setViewState(evt.viewState);
+    onViewStateChange?.(evt.viewState);
+  }, [onViewStateChange]);
+
+  const handleLoad = useCallback(() => {
+    console.log("[BaseMap] Map loaded - ready for operations");
+    setMapLoaded(true);
   }, []);
 
   const handleClick = useCallback(
     (event: any) => {
       if (!onCountryClick) return;
+
+      // Ignore clicks while map is moving/animating
+      if (isMapMoving) {
+        console.log("[BaseMap] Ignoring click - map is moving");
+        return;
+      }
 
       const features = event.features;
 
@@ -105,7 +234,7 @@ export default function BaseMap({
       }
       // If in focus mode but clicked outside features, do nothing (don't allow switching countries)
     },
-    [onCountryClick, focusedCountry],
+    [onCountryClick, focusedCountry, isMapMoving],
   );
 
   const handleMouseMove = useCallback(
@@ -184,18 +313,26 @@ export default function BaseMap({
     }
   }, [onCountryHover, hoveredStateId]);
 
+  // Log render state
+  console.log("[BaseMap] Rendering with:", {
+    focusedCountry,
+    hasAdminBoundaries: !!adminBoundaries,
+    maxBounds,
+    minZoom,
+    viewState: { lng: viewState.longitude, lat: viewState.latitude, zoom: viewState.zoom },
+  });
+
   return (
     <Map
       ref={mapRef}
       {...viewState}
       onMove={handleMove}
+      onLoad={handleLoad}
       onClick={handleClick}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       style={style}
       mapStyle={mapConfig.style}
-      maxBounds={maxBounds || undefined}
-      minZoom={minZoom}
       maxZoom={15}
       interactiveLayerIds={
         focusedCountry && adminBoundaries
