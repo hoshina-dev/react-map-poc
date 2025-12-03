@@ -6,13 +6,87 @@
 import { feature } from "topojson-client";
 import type { Topology, GeometryObject } from "topojson-specification";
 
-import type { GeoJSONFeatureCollection } from "@/types/map";
+import type { GeoJSONFeatureCollection, GeoJSONFeature } from "@/types/map";
 
 // In-memory cache for loaded geographic data
 const geoCache = new Map<
   string,
   { data: GeoJSONFeatureCollection; loadedAt: number }
 >();
+
+/**
+ * Fixes antimeridian crossing issues in GeoJSON features.
+ * Features that cross the antimeridian (180°/-180° line) need to be
+ * split into multiple polygons to render correctly on web maps.
+ * 
+ * This function shifts coordinates that are on the "wrong side" of the
+ * antimeridian by adding 360° to negative longitudes when needed.
+ */
+function fixAntimeridianCrossing(geoJSON: GeoJSONFeatureCollection): GeoJSONFeatureCollection {
+  const fixedFeatures = geoJSON.features.map((feature: GeoJSONFeature) => {
+    const geometry = feature.geometry;
+    if (!geometry) return feature;
+
+    // Type for coordinate arrays
+    type Ring = [number, number][];
+    type Polygon = Ring[];
+    type MultiPolygon = Polygon[];
+
+    let polygons: Polygon[] = [];
+    let isMultiPolygon = false;
+
+    if (geometry.type === 'Polygon') {
+      polygons = [geometry.coordinates as Polygon];
+    } else if (geometry.type === 'MultiPolygon') {
+      polygons = geometry.coordinates as MultiPolygon;
+      isMultiPolygon = true;
+    } else {
+      return feature;
+    }
+
+    let hasAntimeridianIssue = false;
+    const fixedPolygons: Polygon[] = polygons.map(polygon => {
+      return polygon.map(ring => {
+        // Check if this ring crosses the antimeridian
+        const lngs = ring.map(coord => coord[0]);
+        const minLng = Math.min(...lngs);
+        const maxLng = Math.max(...lngs);
+        
+        // If the ring spans more than 180 degrees, it crosses the antimeridian
+        if (maxLng - minLng > 180) {
+          hasAntimeridianIssue = true;
+          // Shift negative longitudes to be > 180
+          return ring.map(coord => {
+            if (coord[0] < 0) {
+              return [coord[0] + 360, coord[1]] as [number, number];
+            }
+            return coord;
+          });
+        }
+        return ring;
+      });
+    });
+
+    if (!hasAntimeridianIssue) {
+      return feature;
+    }
+
+    // Create the fixed geometry
+    const fixedGeometry = isMultiPolygon
+      ? { type: 'MultiPolygon' as const, coordinates: fixedPolygons }
+      : { type: 'Polygon' as const, coordinates: fixedPolygons[0]! };
+
+    return {
+      ...feature,
+      geometry: fixedGeometry,
+    };
+  });
+
+  return {
+    ...geoJSON,
+    features: fixedFeatures,
+  } as GeoJSONFeatureCollection;
+}
 
 /**
  * Base paths for geographic data files
@@ -38,11 +112,8 @@ export async function loadTopoJSON(
   // Check cache first
   const cached = geoCache.get(path);
   if (cached) {
-    console.log(`[GeoDataService] Cache hit: ${path}`);
     return cached.data;
   }
-
-  console.log(`[GeoDataService] Loading: ${path}`);
 
   const response = await fetch(path);
   if (!response.ok) {
@@ -80,15 +151,15 @@ export async function loadTopoJSON(
     throw new Error(`Unsupported data format`);
   }
 
+  // Fix antimeridian crossing issues (Russia, Fiji, Antarctica, etc.)
+  geoJSON = fixAntimeridianCrossing(geoJSON);
+
   // Cache the result
   geoCache.set(path, {
     data: geoJSON,
     loadedAt: Date.now(),
   });
 
-  console.log(
-    `[GeoDataService] Loaded ${geoJSON.features.length} features from ${path}`,
-  );
   return geoJSON;
 }
 
@@ -115,9 +186,6 @@ export async function loadAdminBoundaries(
   const path = GEO_PATHS.adminByCountry(countryName);
 
   try {
-    console.log(
-      `[GeoDataService] Loading admin boundaries for: ${countryName}`,
-    );
     return await loadTopoJSON(path);
   } catch (_error) {
     console.warn(
@@ -132,7 +200,6 @@ export async function loadAdminBoundaries(
  */
 export function clearCache(): void {
   geoCache.clear();
-  console.log("[GeoDataService] Cache cleared");
 }
 
 /**

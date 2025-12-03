@@ -22,10 +22,15 @@ const shapefile = require('shapefile');
 const topojson = require('topojson-server');
 const { feature } = require('topojson-client');
 
-// Paths
-const SHAPEFILE_PATH = 'raw/ne_10m_admin_1_states_provinces/ne_10m_admin_1_states_provinces.shp';
-const TEMP_TOPOJSON = 'public/geo/ne_10m_admin_1_states_provinces.json';
-const OUTPUT_DIR = 'public/geo/admin-by-country';
+// Paths (platform-safe)
+const RAW_DIR = path.join(process.cwd(), 'raw');
+const SHAPEFILE_PATH = path.join(
+  RAW_DIR,
+  'ne_10m_admin_1_states_provinces',
+  'ne_10m_admin_1_states_provinces.shp'
+);
+const TEMP_TOPOJSON = path.join(process.cwd(), 'public', 'geo', 'ne_10m_admin_1_states_provinces.json');
+const OUTPUT_DIR = path.join(process.cwd(), 'public', 'geo', 'admin-by-country');
 
 console.log('🌍 Admin Boundaries Setup Script\n');
 
@@ -70,7 +75,7 @@ async function main() {
   if (!fs.existsSync(tempDir)) {
     fs.mkdirSync(tempDir, { recursive: true });
   }
-  
+
   console.log(`  Writing: ${TEMP_TOPOJSON}`);
   fs.writeFileSync(TEMP_TOPOJSON, JSON.stringify(topology));
   

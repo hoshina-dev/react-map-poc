@@ -20,12 +20,13 @@ if (args.length < 1) {
 const countryName = args[0];
 const outputFile = args[1] || `${countryName.toLowerCase().replace(/\s+/g, '-')}.json`;
 const sourceFile = args[2] || 'world-50m.json';
-const worldFile = path.join(__dirname, '../public/geo', sourceFile);
+const PUBLIC_GEO = path.join(process.cwd(), 'public', 'geo');
+const worldFile = path.join(PUBLIC_GEO, sourceFile);
 
 if (!fs.existsSync(worldFile)) {
   console.error(`Source file not found: ${worldFile}`);
   console.error(`Available files in public/geo:`);
-  const files = fs.readdirSync(path.join(__dirname, '../public/geo'));
+  const files = fs.readdirSync(PUBLIC_GEO);
   files.forEach(f => console.error(`  - ${f}`));
   process.exit(1);
 }
@@ -137,7 +138,8 @@ const countryTopoJSON = {
 };
 
 // Write output
-const outputPath = path.join(__dirname, '../public/geo/countries', outputFile);
+const OUTPUT_DIR = path.join(process.cwd(), 'public', 'geo', 'countries');
+const outputPath = path.join(OUTPUT_DIR, outputFile);
 fs.mkdirSync(path.dirname(outputPath), { recursive: true });
 fs.writeFileSync(outputPath, JSON.stringify(countryTopoJSON));
 
