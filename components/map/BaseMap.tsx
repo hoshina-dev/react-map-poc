@@ -3,9 +3,9 @@
 import "maplibre-gl/dist/maplibre-gl.css";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import Map, { Layer, Source } from "react-map-gl/maplibre";
+import Map from "react-map-gl/maplibre";
 import type { MapRef } from "react-map-gl/maplibre";
-import AdminBoundariesLayer from "./AdminBoundariesLayer";
+import GeoLayer from "./GeoLayer";
 
 import { getMapConfig } from "@/lib/mapConfig";
 import type { ViewState } from "@/types/map";
@@ -45,6 +45,7 @@ export default function BaseMap({
 }: BaseMapProps) {
   const mapConfig = getMapConfig(mapProvider);
   const mapRef = useRef<MapRef>(null);
+  const [hoveredCountry, setHoveredCountry] = useState<string | null>(null);
   const [hoveredProvince, setHoveredProvince] = useState<string | null>(null);
   const [viewState, setViewState] = useState<ViewState>({
     ...DEFAULT_VIEW_STATE,
@@ -213,9 +214,11 @@ export default function BaseMap({
         if (features && features.length > 0) {
           const feature = features[0];
           const countryName = feature.properties?.name || feature.properties?.admin;
+          setHoveredCountry(countryName || null);
           onCountryHover(countryName || null);
           map.getCanvas().style.cursor = "pointer";
         } else {
+          setHoveredCountry(null);
           onCountryHover(null);
           map.getCanvas().style.cursor = "";
         }
@@ -225,6 +228,8 @@ export default function BaseMap({
   );
 
   const handleMouseLeave = useCallback(() => {
+    setHoveredCountry(null);
+    setHoveredProvince(null);
     if (onCountryHover) {
       onCountryHover(null);
     }
@@ -234,12 +239,8 @@ export default function BaseMap({
     }
   }, [onCountryHover]);
 
-  // Log render state
-  console.log("[BaseMap] Rendering with:", {
-    focusedCountry,
-    hasAdminBoundaries: !!adminBoundaries,
-    viewState: { lng: viewState.longitude, lat: viewState.latitude, zoom: viewState.zoom },
-  });
+  // Log render state (reduce noise)
+  // console.log("[BaseMap] Rendering with:", { focusedCountry, hoveredCountry, hoveredProvince });
 
   return (
     <Map
@@ -261,22 +262,26 @@ export default function BaseMap({
             : undefined
       }
     >
+      {/* World countries layer (shown when not focused) */}
       {!focusedCountry && worldCountries && (
-        <Source id="world-countries" type="geojson" data={worldCountries}>
-          <Layer
-            id="world-countries-fill"
-            type="fill"
-            paint={{
-              "fill-color": "transparent",
-              "fill-opacity": 0,
-            }}
-          />
-        </Source>
+        <GeoLayer
+          id="world-countries"
+          data={worldCountries}
+          highlightProperty="name"
+          highlightValue={hoveredCountry}
+          variant="country"
+          showBaseFill={true}
+        />
       )}
+
+      {/* Admin boundaries layer (shown when focused) */}
       {focusedCountry && adminBoundaries && (
-        <AdminBoundariesLayer
-          adminBoundaries={adminBoundaries}
-          hoveredProvince={hoveredProvince}
+        <GeoLayer
+          id="admin-boundaries"
+          data={adminBoundaries}
+          highlightProperty="name_en"
+          highlightValue={hoveredProvince}
+          variant="default"
         />
       )}
     </Map>

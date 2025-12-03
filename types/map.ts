@@ -2,7 +2,7 @@
  * Type definitions for map components
  */
 
-import type { Feature, FeatureCollection, Geometry } from "geojson";
+import type { Feature, FeatureCollection, Geometry, Polygon, MultiPolygon } from "geojson";
 
 export interface ViewState {
   longitude: number;
@@ -18,6 +18,8 @@ export interface MapBounds {
   east: number;
   west: number;
 }
+
+export type GeoJSONGeometry = Geometry | Polygon | MultiPolygon;
 
 export type GeoJSONFeature = Feature<Geometry, CountryProperties>;
 
