@@ -61,23 +61,17 @@ export default function MapContainer({ mapProvider }: MapContainerProps) {
 
     async function loadCountryData() {
       setLoading(true);
-
-      // Keep focusedCountry in local variable but don't pass to BaseMap yet
       const countryToLoad = focusedCountry;
-
       try {
         const boundaries = await loadAdminBoundaries(countryToLoad!);
-        if (
-          !boundaries ||
-          !boundaries.features ||
-          boundaries.features.length === 0
-        ) {
+        if (!boundaries || !boundaries.features || boundaries.features.length === 0) {
           console.warn(`No boundaries found for ${countryToLoad}`);
-          setFocusedCountry(null);
+          setAdminBoundaries(null);
+          setFitToBounds(null);
           setLoading(false);
+          // Do NOT clear focusedCountry, allow user to try another country
           return;
         }
-
         // Add unique IDs to features for hover state
         const featuresWithIds = {
           ...boundaries,
@@ -86,39 +80,23 @@ export default function MapContainer({ mapProvider }: MapContainerProps) {
             id: i,
           })),
         };
-
         // Calculate bounding box for the country (use featuresWithIds to preserve IDs)
         let [minLng, minLat, maxLng, maxLat] = bbox(featuresWithIds);
-
         // Handle date line crossing (e.g., US with Alaska)
-        // If longitude span > 180°, likely crosses date line
         if (maxLng - minLng > 180) {
-          // Filter out features that cross the date line themselves
-          // AND features that are far west (Alaska) or far east (Pacific territories)
           const mainFeatures = featuresWithIds.features.filter((f) => {
             try {
               const featureBbox = bbox(f);
               if (!featureBbox) return false;
-
               const [fMinLng, , fMaxLng] = featureBbox;
-
-              // Exclude features that themselves cross date line (span > 180°)
-              if (fMaxLng - fMinLng > 180) {
-                return false;
-              }
-
-              // Exclude features in extreme west (< -130, Alaska) or east (> 170, Pacific)
+              if (fMaxLng - fMinLng > 180) return false;
               const centerLng = (fMinLng + fMaxLng) / 2;
-              if (centerLng < -130 || centerLng > 170) {
-                return false;
-              }
-
+              if (centerLng < -130 || centerLng > 170) return false;
               return true;
             } catch {
               return false;
             }
           });
-
           if (mainFeatures.length > 0) {
             const mainBoundaries = {
               type: "FeatureCollection" as const,
@@ -127,27 +105,19 @@ export default function MapContainer({ mapProvider }: MapContainerProps) {
             [minLng, minLat, maxLng, maxLat] = bbox(mainBoundaries);
           }
         }
-
         // Validate bounds
-        if (
-          !isFinite(minLng) ||
-          !isFinite(maxLng) ||
-          !isFinite(minLat) ||
-          !isFinite(maxLat)
-        ) {
+        if (!isFinite(minLng) || !isFinite(maxLng) || !isFinite(minLat) || !isFinite(maxLat)) {
           console.error(`Invalid bounds for ${countryToLoad}`);
-          setFocusedCountry(null);
+          setAdminBoundaries(null);
+          setFitToBounds(null);
           setLoading(false);
           return;
         }
-
         // Set max bounds with minimal padding (5%)
         const lngDiff = maxLng - minLng;
         const latDiff = maxLat - minLat;
         const lngPadding = lngDiff * 0.05;
         const latPadding = latDiff * 0.05;
-
-        // Clamp bounds to valid Web Mercator limits
         const [clampedMinLng, clampedMinLat] = clampCoordinates(
           minLng - lngPadding,
           minLat - latPadding
@@ -156,29 +126,24 @@ export default function MapContainer({ mapProvider }: MapContainerProps) {
           maxLng + lngPadding,
           maxLat + latPadding
         );
-
         const bounds: [[number, number], [number, number]] = [
           [clampedMinLng, clampedMinLat],
           [clampedMaxLng, clampedMaxLat],
         ];
-
-        // Batch all state updates together - React will batch these automatically
         setAdminBoundaries(featuresWithIds);
         setFitToBounds(bounds);
         setLoading(false);
-
-        // Clear transition lock after everything is set
         setTimeout(() => {
           setIsTransitioning(false);
         }, 200);
       } catch (error) {
-        console.error("Failed to load admin boundaries:", error);
-        setFocusedCountry(null);
+        console.warn("Failed to load admin boundaries:", error);
+        setAdminBoundaries(null);
+        setFitToBounds(null);
         setLoading(false);
         setIsTransitioning(false);
       }
     }
-
     loadCountryData();
   }, [focusedCountry]);
 
