@@ -12,19 +12,11 @@ const path = require('path');
 
 console.log('🔍 Verifying World Map POC Setup\n');
 
+
+const world110Path = 'public/geo/world-110m.json';
+const world50Path = 'public/geo/world-50m.json';
+
 const checks = [
-  {
-    name: 'World map (110m)',
-    path: 'public/geo/world-110m.json',
-    required: true,
-    type: 'file'
-  },
-  {
-    name: 'World map (50m)',
-    path: 'public/geo/world-50m.json',
-    required: true,
-    type: 'file'
-  },
   {
     name: 'Admin boundaries directory',
     path: 'public/geo/admin-by-country',
@@ -41,8 +33,30 @@ const checks = [
   }
 ];
 
+
 let allPassed = true;
 let needsSetup = false;
+
+// Check for at least one world map file
+const has110 = fs.existsSync(world110Path) && fs.statSync(world110Path).isFile();
+const has50 = fs.existsSync(world50Path) && fs.statSync(world50Path).isFile();
+
+if (has110 || has50) {
+  if (has110) {
+    const size = fs.statSync(world110Path).size;
+    console.log(`✓ World map (110m) present\n  Size: ${(size / 1024).toFixed(1)} KB`);
+  }
+  if (has50) {
+    const size = fs.statSync(world50Path).size;
+    console.log(`✓ World map (50m) present\n  Size: ${(size / 1024).toFixed(1)} KB`);
+  }
+} else {
+  console.log('✗ World map (110m or 50m) - MISSING (REQUIRED)');
+  console.log('  At least one of these files must exist:');
+  console.log(`    - ${world110Path}`);
+  console.log(`    - ${world50Path}`);
+  allPassed = false;
+}
 
 checks.forEach(check => {
   const exists = fs.existsSync(check.path);
@@ -50,35 +64,20 @@ checks.forEach(check => {
     (check.type === 'file' && fs.statSync(check.path).isFile()) ||
     (check.type === 'directory' && fs.statSync(check.path).isDirectory())
   );
-  
-  if (check.required) {
-    if (exists && isCorrectType) {
-      console.log(`✓ ${check.name}`);
-      if (check.type === 'file') {
-        const size = fs.statSync(check.path).size;
-        console.log(`  Size: ${(size / 1024).toFixed(1)} KB`);
+  if (exists && isCorrectType) {
+    console.log(`✓ ${check.name}`);
+    if (check.type === 'directory') {
+      const files = fs.readdirSync(check.path).filter(f => f.endsWith('.json'));
+      if (files.length > 0) {
+        console.log(`  Files: ${files.length}`);
       }
-    } else {
-      console.log(`✗ ${check.name} - MISSING (REQUIRED)`);
-      console.log(`  Path: ${check.path}`);
-      allPassed = false;
     }
   } else {
-    if (exists && isCorrectType) {
-      console.log(`✓ ${check.name}`);
-      if (check.type === 'directory') {
-        const files = fs.readdirSync(check.path).filter(f => f.endsWith('.json'));
-        if (files.length > 0) {
-          console.log(`  Files: ${files.length}`);
-        }
-      }
-    } else {
-      console.log(`⚠ ${check.name} - Not set up (optional)`);
-      if (check.setupCmd) {
-        console.log(`  Run: ${check.setupCmd}`);
-      }
-      needsSetup = true;
+    console.log(`⚠ ${check.name} - Not set up (optional)`);
+    if (check.setupCmd) {
+      console.log(`  Run: ${check.setupCmd}`);
     }
+    needsSetup = true;
   }
   console.log();
 });
