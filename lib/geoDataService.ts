@@ -89,17 +89,25 @@ function fixAntimeridianCrossing(geoJSON: GeoJSONFeatureCollection): GeoJSONFeat
 }
 
 /**
+ * Get the base path for assets (handles GitHub Pages subpath)
+ * Uses NEXT_PUBLIC_BASE_PATH environment variable set at build time
+ */
+function getBasePath(): string {
+  return process.env.NEXT_PUBLIC_BASE_PATH || "";
+}
+
+/**
  * Base paths for geographic data files
  */
 export const GEO_PATHS = {
-  worldLow: "/geo/world-110m.json",
-  worldMedium: "/geo/world-50m.json",
+  worldLow: () => `${getBasePath()}/geo/world-110m.json`,
+  worldMedium: () => `${getBasePath()}/geo/world-50m.json`,
   adminByCountry: (countryName: string) => {
     const filename = countryName
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "");
-    return `/geo/admin-by-country/${filename}-admin.json`;
+    return `${getBasePath()}/geo/admin-by-country/${filename}-admin.json`;
   },
 } as const;
 
@@ -168,12 +176,12 @@ export async function loadTopoJSON(
  */
 export async function loadWorldMap(): Promise<GeoJSONFeatureCollection> {
   try {
-    return await loadTopoJSON(GEO_PATHS.worldLow);
+    return await loadTopoJSON(GEO_PATHS.worldLow());
   } catch (_error) {
     console.warn(
       "[GeoDataService] world-110m.json not found, trying world-50m.json",
     );
-    return loadTopoJSON(GEO_PATHS.worldMedium);
+    return loadTopoJSON(GEO_PATHS.worldMedium());
   }
 }
 
