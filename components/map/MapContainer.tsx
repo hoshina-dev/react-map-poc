@@ -7,7 +7,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import type { MapProvider } from "@/lib/mapConfig";
 
 import { loadAdminBoundaries } from "@/lib/geoDataService";
-import { validateCoordinates, clampCoordinates } from "@/lib/mapConfig";
+import { clampCoordinates } from "@/lib/mapConfig";
 import type { GeoJSONFeatureCollection, ViewState } from "@/types/map";
 import { bbox } from "@turf/turf";
 
@@ -30,9 +30,7 @@ export default function MapContainer({ mapProvider }: MapContainerProps) {
     useState<GeoJSONFeatureCollection | null>(null);
   const [worldCountries, setWorldCountries] =
     useState<GeoJSONFeatureCollection | null>(null);
-  const [maxBounds, setMaxBounds] = useState<
-    [[number, number], [number, number]] | null
-  >(null);
+
   const [fitToBounds, setFitToBounds] = useState<
     [[number, number], [number, number]] | null
   >(null);
@@ -63,7 +61,6 @@ export default function MapContainer({ mapProvider }: MapContainerProps) {
     if (!focusedCountry) {
       console.log("[MapContainer] No focused country, clearing boundaries");
       setAdminBoundaries(null);
-      setMaxBounds(null);
       setFitToBounds(null);
       return;
     }
@@ -193,7 +190,6 @@ export default function MapContainer({ mapProvider }: MapContainerProps) {
 
         // Batch all state updates together - React will batch these automatically
         setAdminBoundaries(featuresWithIds);
-        setMaxBounds(bounds);
         setFitToBounds(bounds);
         setLoading(false);
 
@@ -258,7 +254,6 @@ export default function MapContainer({ mapProvider }: MapContainerProps) {
     console.log("[MapContainer] Current state:", {
       focusedCountry,
       hasAdminBoundaries: !!adminBoundaries,
-      maxBounds,
       viewState,
     });
 
@@ -269,7 +264,6 @@ export default function MapContainer({ mapProvider }: MapContainerProps) {
     setFocusedCountry(null);
     setHoveredRegion(null);
     setAdminBoundaries(null);
-    setMaxBounds(null);
     setFitToBounds(null);
     setLoading(false);
 
@@ -281,7 +275,7 @@ export default function MapContainer({ mapProvider }: MapContainerProps) {
       console.log("[MapContainer] Exit transition complete");
       setIsTransitioning(false);
     }, 300);
-  }, [focusedCountry, adminBoundaries, maxBounds, viewState]);
+  }, [focusedCountry, adminBoundaries, viewState]);
 
   return (
     <Box style={{ width: "100%", maxWidth: 1200, margin: "0 auto" }}>
@@ -302,7 +296,6 @@ export default function MapContainer({ mapProvider }: MapContainerProps) {
         focusedCountry={focusedCountry}
         adminBoundaries={adminBoundaries}
         worldCountries={worldCountries}
-        maxBounds={maxBounds}
         fitToBounds={fitToBounds}
         mapProvider={mapProvider}
         style={{ width: "100%", height: "600px", borderRadius: "8px" }}

@@ -3,12 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "predev": "npm run setup",
+    "predev":"node scripts/check-and-download.js",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "verify": "node scripts/verify-setup.js",
-    "setup": "node scripts/check-and-download.js"
+    "verify": "node scripts/verify-setup.js"
   },
   "dependencies": {
     "@mantine/core": "^8.3.8",

@@ -18,7 +18,6 @@ interface BaseMapProps {
   focusedCountry?: string | null;
   adminBoundaries?: any;
   worldCountries?: any;
-  maxBounds?: [[number, number], [number, number]] | null;
   fitToBounds?: [[number, number], [number, number]] | null;
   style?: React.CSSProperties;
   mapProvider?: "osm" | "positron" | "maplibre-demo" | "mapbox";
@@ -40,7 +39,6 @@ export default function BaseMap({
   focusedCountry,
   adminBoundaries,
   worldCountries,
-  maxBounds,
   fitToBounds,
   style = { width: "100%", height: "600px" },
   mapProvider = "positron",
@@ -52,7 +50,6 @@ export default function BaseMap({
     ...DEFAULT_VIEW_STATE,
     ...initialViewState,
   });
-  const [minZoom, setMinZoom] = useState<number | undefined>(undefined);
   const [isMapMoving, setIsMapMoving] = useState(false);
   const [mapLoaded, setMapLoaded] = useState(false);
 
@@ -102,50 +99,10 @@ export default function BaseMap({
     
     // Update internal state but don't trigger onViewStateChange to prevent loop
     setViewState((prev) => ({ ...prev, ...initialViewState }));
-    
-    // Only manage minZoom when entering focus mode, not when exiting
-    if (focusedCountry && initialViewState.zoom) {
-      console.log("[BaseMap] Setting minZoom to:", initialViewState.zoom);
-      setMinZoom(initialViewState.zoom);
-      if (map) {
-        map.setMinZoom(initialViewState.zoom);
-      }
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusedCountry, mapLoaded]); // Depend on mapLoaded to ensure map is ready
 
-  // Clear minZoom when exiting focus mode
-  useEffect(() => {
-    if (!mapLoaded) return;
-    
-    if (!focusedCountry && minZoom !== undefined) {
-      console.log("[BaseMap] Exiting focus mode - clearing minZoom");
-      setMinZoom(undefined);
-      const map = mapRef.current?.getMap();
-      if (map) {
-        map.setMinZoom(0); // Reset to no minimum zoom
-      }
-    }
-  }, [focusedCountry, minZoom]);
-
   // Hover state for admin boundaries is handled by AdminBoundariesLayer
-
-  // Set maxBounds on MapLibre instance
-  useEffect(() => {
-    if (!mapLoaded) return;
-    
-    console.log("[BaseMap] maxBounds changed:", maxBounds);
-    const map = mapRef.current?.getMap();
-    if (map) {
-      if (maxBounds === null) {
-        console.log("[BaseMap] Explicitly removing maxBounds from map");
-        map.setMaxBounds(undefined);
-      } else {
-        console.log("[BaseMap] Setting maxBounds on map:", maxBounds);
-        map.setMaxBounds(maxBounds);
-      }
-    }
-  }, [maxBounds]);
 
   // Fit to bounds when entering focus mode
   useEffect(() => {
@@ -281,8 +238,6 @@ export default function BaseMap({
   console.log("[BaseMap] Rendering with:", {
     focusedCountry,
     hasAdminBoundaries: !!adminBoundaries,
-    maxBounds,
-    minZoom,
     viewState: { lng: viewState.longitude, lat: viewState.latitude, zoom: viewState.zoom },
   });
 
