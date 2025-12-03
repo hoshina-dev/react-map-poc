@@ -112,11 +112,8 @@ export async function loadTopoJSON(
   // Check cache first
   const cached = geoCache.get(path);
   if (cached) {
-    console.log(`[GeoDataService] Cache hit: ${path}`);
     return cached.data;
   }
-
-  console.log(`[GeoDataService] Loading: ${path}`);
 
   const response = await fetch(path);
   if (!response.ok) {
@@ -163,9 +160,6 @@ export async function loadTopoJSON(
     loadedAt: Date.now(),
   });
 
-  console.log(
-    `[GeoDataService] Loaded ${geoJSON.features.length} features from ${path}`,
-  );
   return geoJSON;
 }
 
@@ -192,9 +186,6 @@ export async function loadAdminBoundaries(
   const path = GEO_PATHS.adminByCountry(countryName);
 
   try {
-    console.log(
-      `[GeoDataService] Loading admin boundaries for: ${countryName}`,
-    );
     return await loadTopoJSON(path);
   } catch (_error) {
     console.warn(
@@ -209,7 +200,6 @@ export async function loadAdminBoundaries(
  */
 export function clearCache(): void {
   geoCache.clear();
-  console.log("[GeoDataService] Cache cleared");
 }
 
 /**

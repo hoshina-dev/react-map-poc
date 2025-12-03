@@ -53,20 +53,13 @@ export default function MapContainer({ mapProvider }: MapContainerProps) {
 
   // Load admin boundaries when a country is focused
   useEffect(() => {
-    console.log(
-      "[MapContainer] Focus effect triggered, focusedCountry:",
-      focusedCountry
-    );
-
     if (!focusedCountry) {
-      console.log("[MapContainer] No focused country, clearing boundaries");
       setAdminBoundaries(null);
       setFitToBounds(null);
       return;
     }
 
     async function loadCountryData() {
-      console.log(`[MapContainer] Loading boundaries for: ${focusedCountry}`);
       setLoading(true);
 
       // Keep focusedCountry in local variable but don't pass to BaseMap yet
@@ -94,19 +87,12 @@ export default function MapContainer({ mapProvider }: MapContainerProps) {
           })),
         };
 
-        console.log(
-          `[MapContainer] Added IDs to ${featuresWithIds.features.length} features. Sample ID:`,
-          featuresWithIds.features[0]?.id
-        );
-
         // Calculate bounding box for the country (use featuresWithIds to preserve IDs)
         let [minLng, minLat, maxLng, maxLat] = bbox(featuresWithIds);
 
         // Handle date line crossing (e.g., US with Alaska)
         // If longitude span > 180°, likely crosses date line
         if (maxLng - minLng > 180) {
-          console.log(`${countryToLoad} crosses date line, adjusting bounds`);
-
           // Filter out features that cross the date line themselves
           // AND features that are far west (Alaska) or far east (Pacific territories)
           const mainFeatures = featuresWithIds.features.filter((f) => {
@@ -118,16 +104,12 @@ export default function MapContainer({ mapProvider }: MapContainerProps) {
 
               // Exclude features that themselves cross date line (span > 180°)
               if (fMaxLng - fMinLng > 180) {
-                console.log(
-                  `  Excluding date-line crossing feature at [${fMinLng.toFixed(1)}, ${fMaxLng.toFixed(1)}]`
-                );
                 return false;
               }
 
               // Exclude features in extreme west (< -130, Alaska) or east (> 170, Pacific)
               const centerLng = (fMinLng + fMaxLng) / 2;
               if (centerLng < -130 || centerLng > 170) {
-                console.log(`  Excluding outlier at ${centerLng.toFixed(1)}°`);
                 return false;
               }
 
@@ -138,9 +120,6 @@ export default function MapContainer({ mapProvider }: MapContainerProps) {
           });
 
           if (mainFeatures.length > 0) {
-            console.log(
-              `Filtered to ${mainFeatures.length} continental features`
-            );
             const mainBoundaries = {
               type: "FeatureCollection" as const,
               features: mainFeatures,
@@ -183,11 +162,6 @@ export default function MapContainer({ mapProvider }: MapContainerProps) {
           [clampedMaxLng, clampedMaxLat],
         ];
 
-        console.log(
-          `[MapContainer] ${countryToLoad} - Bounds: [${lngDiff.toFixed(2)}° x ${latDiff.toFixed(2)}°]`
-        );
-        console.log(`[MapContainer] All data ready, batching state updates`);
-
         // Batch all state updates together - React will batch these automatically
         setAdminBoundaries(featuresWithIds);
         setFitToBounds(bounds);
@@ -195,9 +169,6 @@ export default function MapContainer({ mapProvider }: MapContainerProps) {
 
         // Clear transition lock after everything is set
         setTimeout(() => {
-          console.log(
-            `[MapContainer] Transition complete for ${countryToLoad}`
-          );
           setIsTransitioning(false);
         }, 200);
       } catch (error) {
@@ -215,18 +186,11 @@ export default function MapContainer({ mapProvider }: MapContainerProps) {
     (countryName: string) => {
       // Prevent clicking during transitions, loading, or when already focused
       if (focusedCountry || loading || isTransitioning) {
-        console.log(
-          "Already in focus mode, loading, or transitioning - ignoring click"
-        );
         return;
       }
-      console.log("[MapContainer] Country clicked:", countryName);
       setIsTransitioning(true);
 
       // First reset to world view to ensure clean state
-      console.log(
-        "[MapContainer] Resetting to world view before loading country"
-      );
       setViewState({ longitude: 0, latitude: 20, zoom: 2 });
 
       // Small delay to let map reset, then load country
@@ -250,13 +214,6 @@ export default function MapContainer({ mapProvider }: MapContainerProps) {
   }, []);
 
   const exitFocusMode = useCallback(() => {
-    console.log("[MapContainer] exitFocusMode called");
-    console.log("[MapContainer] Current state:", {
-      focusedCountry,
-      hasAdminBoundaries: !!adminBoundaries,
-      viewState,
-    });
-
     // Lock transitions during exit
     setIsTransitioning(true);
 
@@ -266,16 +223,13 @@ export default function MapContainer({ mapProvider }: MapContainerProps) {
     setAdminBoundaries(null);
     setFitToBounds(null);
     setLoading(false);
-
-    console.log("[MapContainer] State cleared, resetting view to world");
     setViewState({ longitude: 0, latitude: 20, zoom: 2 });
 
     // Clear transition lock after zoom out completes
     setTimeout(() => {
-      console.log("[MapContainer] Exit transition complete");
       setIsTransitioning(false);
     }, 300);
-  }, [focusedCountry, adminBoundaries, viewState]);
+  }, []);
 
   return (
     <Box style={{ width: "100%", maxWidth: 1200, margin: "0 auto" }}>

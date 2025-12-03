@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, memo } from "react";
 import { Source, Layer } from "react-map-gl/maplibre";
 import type { LayerProps } from "react-map-gl/maplibre";
 import type { FilterSpecification } from "maplibre-gl";
@@ -53,8 +53,9 @@ interface GeoLayerProps {
 /**
  * Reusable geographic layer component with hover highlighting.
  * Uses MapLibre's filter-based approach for efficient rendering.
+ * Memoized to prevent unnecessary re-renders.
  */
-export default function GeoLayer({
+function GeoLayerComponent({
   id,
   data,
   highlightProperty,
@@ -69,41 +70,42 @@ export default function GeoLayer({
     return { ...baseStyle, ...customStyle };
   }, [variant, customStyle]);
 
-  // Create filter expression for highlighting
+  // Memoize layer props to prevent re-renders
+  const baseLayerProps: LayerProps = useMemo(() => ({
+    id: `${id}-fill`,
+    type: "fill" as const,
+    paint: {
+      "fill-color": layerStyle.fillColor,
+      "fill-opacity": layerStyle.fillOpacity,
+    },
+  }), [id, layerStyle.fillColor, layerStyle.fillOpacity]);
+
+  const lineLayerProps: LayerProps = useMemo(() => ({
+    id: `${id}-line`,
+    type: "line" as const,
+    paint: {
+      "line-color": layerStyle.lineColor,
+      "line-width": layerStyle.lineWidth,
+    },
+  }), [id, layerStyle.lineColor, layerStyle.lineWidth]);
+
+  // Create filter expression for highlighting - only changes when highlight changes
   const highlightFilter: FilterSpecification = useMemo(
     () => ["==", ["get", highlightProperty], highlightValue || ""],
     [highlightProperty, highlightValue]
   );
 
-  if (!data) return null;
-
-  const baseLayerProps: LayerProps = {
-    id: `${id}-fill`,
-    type: "fill",
-    paint: {
-      "fill-color": layerStyle.fillColor,
-      "fill-opacity": layerStyle.fillOpacity,
-    },
-  };
-
-  const highlightLayerProps: LayerProps = {
+  const highlightLayerProps: LayerProps = useMemo(() => ({
     id: `${id}-highlight`,
-    type: "fill",
+    type: "fill" as const,
     paint: {
       "fill-color": layerStyle.highlightColor,
       "fill-opacity": layerStyle.highlightOpacity,
     },
     filter: highlightFilter,
-  };
+  }), [id, layerStyle.highlightColor, layerStyle.highlightOpacity, highlightFilter]);
 
-  const lineLayerProps: LayerProps = {
-    id: `${id}-line`,
-    type: "line",
-    paint: {
-      "line-color": layerStyle.lineColor,
-      "line-width": layerStyle.lineWidth,
-    },
-  };
+  if (!data) return null;
 
   return (
     <Source id={id} type="geojson" data={data}>
@@ -113,6 +115,10 @@ export default function GeoLayer({
     </Source>
   );
 }
+
+// Memoize the entire component - only re-render when props actually change
+const GeoLayer = memo(GeoLayerComponent);
+export default GeoLayer;
 
 // Export types for external use
 export type { GeoLayerProps, LayerStyle };
