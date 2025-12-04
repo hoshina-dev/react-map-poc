@@ -41,8 +41,7 @@ export const OSM_STYLE = {
 /**
  * MapLibre Demo Style
  */
-export const MAPLIBRE_DEMO_STYLE =
-  "https://demotiles.maplibre.org/style.json";
+export const MAPLIBRE_DEMO_STYLE = "https://demotiles.maplibre.org/style.json";
 
 /**
  * Carto Positron Style (clean white/light theme)
@@ -93,11 +92,11 @@ export function transformCoordinates(
   provider: MapProvider = "positron",
 ): [number, number] {
   const config = MAP_CONFIGS[provider];
-  
+
   if (config.coordinateTransform) {
     return config.coordinateTransform(lng, lat);
   }
-  
+
   return [lng, lat];
 }
 

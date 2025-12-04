@@ -9,7 +9,7 @@ import type { GeoJSONFeature, ViewState } from "@/types/map";
 /**
  * Gets the center coordinates of a GeoJSON feature
  */
-export function getFeatureCenter(feature: GeoJSONFeature): [number, number] {
+function getFeatureCenter(feature: GeoJSONFeature): [number, number] {
   try {
     const centerPoint = center(feature);
     return centerPoint.geometry.coordinates as [number, number];
@@ -22,7 +22,7 @@ export function getFeatureCenter(feature: GeoJSONFeature): [number, number] {
 /**
  * Gets the bounding box of a GeoJSON feature
  */
-export function getFeatureBounds(
+function getFeatureBounds(
   feature: GeoJSONFeature,
 ): [number, number, number, number] {
   try {
@@ -36,7 +36,7 @@ export function getFeatureBounds(
 /**
  * Calculates appropriate zoom level based on bounding box
  */
-export function calculateZoomFromBounds(
+function calculateZoomFromBounds(
   bounds: [number, number, number, number],
   _mapWidth: number = 800,
   _mapHeight: number = 600,
@@ -51,6 +51,7 @@ export function calculateZoomFromBounds(
 
   // Heuristic: smaller range = higher zoom
   // This approximation works for web mercator projection
+  // https://en.wikipedia.org/wiki/Web_Mercator_projection
   let zoom = Math.log2(360 / maxRange) - 1;
 
   // Clamp zoom between reasonable values
@@ -62,7 +63,7 @@ export function calculateZoomFromBounds(
 /**
  * Creates a view state to focus on a specific feature
  */
-export function createViewStateForFeature(
+function createViewStateForFeature(
   feature: GeoJSONFeature,
   mapWidth?: number,
   mapHeight?: number,
@@ -74,6 +75,65 @@ export function createViewStateForFeature(
   return {
     longitude,
     latitude,
+    zoom,
+    pitch: 0,
+    bearing: 0,
+  };
+}
+
+/**
+ * Calculate a recommended view (center + zoom) for a given focus level
+ * and optional feature. This centralizes zoom heuristics so the app can
+ * consistently determine how far to zoom when entering a focus mode.
+ *
+ * Parameters:
+ * - focusedLevel: integer admin level (0 = world, 1 = country, 2 = admin2, ...)
+ * - feature: optional GeoJSON feature to focus on (if omitted, returns a
+ *   default world view for level 0 or no-op for deeper levels)
+ * - mapWidth/mapHeight: optional viewport size to improve zoom calculation
+ */
+export function calculateViewForFocus(
+  focusedLevel: number,
+  feature?: GeoJSONFeature | null,
+  mapWidth?: number,
+  mapHeight?: number,
+): ViewState {
+  // Default world view
+  const WORLD_VIEW: ViewState = {
+    longitude: 0,
+    latitude: 20,
+    zoom: 2,
+    pitch: 0,
+    bearing: 0,
+  };
+
+  // If no feature provided, return world view for level 0
+  if (!feature) {
+    if (focusedLevel === 0) return WORLD_VIEW;
+    // For deeper levels without a feature, fallback to world view as a safe default
+    return WORLD_VIEW;
+  }
+
+  // Compute a base view from the feature bounds/center
+  const baseView = createViewStateForFeature(feature, mapWidth, mapHeight);
+
+  // Level-based clamps to ensure the zoom feels appropriate for the level
+  const levelClamps: Record<number, { min: number; max: number }> = {
+    0: { min: 1, max: 4 },
+    1: { min: 3, max: 8 },
+    2: { min: 6, max: 12 },
+    3: { min: 8, max: 14 },
+    4: { min: 10, max: 15 },
+  };
+
+  const clamp = levelClamps[focusedLevel] ?? { min: 3, max: 12 };
+
+  // Apply clamp to the computed zoom
+  const zoom = Math.max(clamp.min, Math.min(baseView.zoom, clamp.max));
+
+  return {
+    longitude: baseView.longitude,
+    latitude: baseView.latitude,
     zoom,
     pitch: 0,
     bearing: 0,

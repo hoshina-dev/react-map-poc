@@ -1,5 +1,7 @@
-export { default as MapContainer } from "./MapContainer";
-export { default as BaseMap } from "./BaseMap";
+export { default as SiteMap } from "./SiteMap";
+export type { SiteMapHandle, SiteMapProps, FocusState, FocusedEntity, LevelConfig } from "./SiteMap";
+export { MAX_FOCUS_LEVEL } from "./SiteMap";
 export { default as MapInfoBar } from "./MapInfoBar";
-export { default as GeoLayer } from "./GeoLayer";
+export type { MapInfoBarProps } from "./MapInfoBar";
 export type { GeoLayerProps, LayerStyle } from "./GeoLayer";
+export { default as GeoLayer } from "./GeoLayer";
