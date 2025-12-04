@@ -6,9 +6,7 @@ import { useCallback, useRef, useState } from "react";
 import { ColorSchemeToggle } from "@/components/demo/ColorSchemeToggle";
 import { MapInfoBar, SiteMap } from "@/components/map";
 import type { FocusState, SiteMapHandle } from "@/components/map";
-import { getBasePath } from "@/lib/config";
-
-const basePath = getBasePath();
+import { BASE_PATH } from "@/const";
 
 const DEFAULT_FOCUS_STATE: FocusState = {
   level: 0,
@@ -31,7 +29,7 @@ export default function Home() {
       <Flex direction="column" align="center" gap="xl">
         <ColorSchemeToggle />
         <Title order={1}>Interactive World Map</Title>
-        {basePath === "/react-map-poc" ? (
+        {BASE_PATH === "/react-map-poc" ? (
           <Text c="dimmed" size="sm">
             Focus mode works for USA, Thailand, and Japan
           </Text>

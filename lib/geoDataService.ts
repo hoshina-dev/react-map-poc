@@ -8,7 +8,7 @@ import type { GeometryObject, Topology } from "topojson-specification";
 
 import type { GeoJSONFeatureCollection } from "@/types/map";
 import { fixAntimeridianCrossing } from "./geoUtils";
-import { getBasePath } from "./config";
+import { BASE_PATH } from "@/const";
 
 // In-memory cache for loaded geographic data
 const geoCache = new Map<
@@ -18,20 +18,20 @@ const geoCache = new Map<
 
 // Antimeridian fixing is provided by `lib/geoUtils.ts` and imported above.
 
-// `getBasePath` is provided by `lib/config.ts` and imported above.
+// `BASE_PATH` is provided by `const/index.ts` and imported above.
 
 /**
  * Base paths for geographic data files
  */
 export const GEO_PATHS = {
-  worldLow: () => `${getBasePath()}/geo/world-110m.json`,
-  worldMedium: () => `${getBasePath()}/geo/world-50m.json`,
+  worldLow: () => `${BASE_PATH}/geo/world-110m.json`,
+  worldMedium: () => `${BASE_PATH}/geo/world-50m.json`,
   adminByCountry: (countryName: string) => {
     const filename = countryName
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "");
-    return `${getBasePath()}/geo/admin-by-country/${filename}-admin.json`;
+    return `${BASE_PATH}/geo/admin-by-country/${filename}-admin.json`;
   },
 } as const;
 
