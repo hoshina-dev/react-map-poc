@@ -4,9 +4,11 @@
  */
 
 import { feature } from "topojson-client";
-import type { Topology, GeometryObject } from "topojson-specification";
+import type { GeometryObject, Topology } from "topojson-specification";
 
-import type { GeoJSONFeatureCollection, GeoJSONFeature } from "@/types/map";
+import type { GeoJSONFeatureCollection } from "@/types/map";
+import { fixAntimeridianCrossing } from "./geoUtils";
+import { BASE_PATH } from "@/const";
 
 // In-memory cache for loaded geographic data
 const geoCache = new Map<
@@ -14,100 +16,22 @@ const geoCache = new Map<
   { data: GeoJSONFeatureCollection; loadedAt: number }
 >();
 
-/**
- * Fixes antimeridian crossing issues in GeoJSON features.
- * Features that cross the antimeridian (180°/-180° line) need to be
- * split into multiple polygons to render correctly on web maps.
- * 
- * This function shifts coordinates that are on the "wrong side" of the
- * antimeridian by adding 360° to negative longitudes when needed.
- */
-function fixAntimeridianCrossing(geoJSON: GeoJSONFeatureCollection): GeoJSONFeatureCollection {
-  const fixedFeatures = geoJSON.features.map((feature: GeoJSONFeature) => {
-    const geometry = feature.geometry;
-    if (!geometry) return feature;
+// Antimeridian fixing is provided by `lib/geoUtils.ts` and imported above.
 
-    // Type for coordinate arrays
-    type Ring = [number, number][];
-    type Polygon = Ring[];
-    type MultiPolygon = Polygon[];
-
-    let polygons: Polygon[] = [];
-    let isMultiPolygon = false;
-
-    if (geometry.type === 'Polygon') {
-      polygons = [geometry.coordinates as Polygon];
-    } else if (geometry.type === 'MultiPolygon') {
-      polygons = geometry.coordinates as MultiPolygon;
-      isMultiPolygon = true;
-    } else {
-      return feature;
-    }
-
-    let hasAntimeridianIssue = false;
-    const fixedPolygons: Polygon[] = polygons.map(polygon => {
-      return polygon.map(ring => {
-        // Check if this ring crosses the antimeridian
-        const lngs = ring.map(coord => coord[0]);
-        const minLng = Math.min(...lngs);
-        const maxLng = Math.max(...lngs);
-        
-        // If the ring spans more than 180 degrees, it crosses the antimeridian
-        if (maxLng - minLng > 180) {
-          hasAntimeridianIssue = true;
-          // Shift negative longitudes to be > 180
-          return ring.map(coord => {
-            if (coord[0] < 0) {
-              return [coord[0] + 360, coord[1]] as [number, number];
-            }
-            return coord;
-          });
-        }
-        return ring;
-      });
-    });
-
-    if (!hasAntimeridianIssue) {
-      return feature;
-    }
-
-    // Create the fixed geometry
-    const fixedGeometry = isMultiPolygon
-      ? { type: 'MultiPolygon' as const, coordinates: fixedPolygons }
-      : { type: 'Polygon' as const, coordinates: fixedPolygons[0]! };
-
-    return {
-      ...feature,
-      geometry: fixedGeometry,
-    };
-  });
-
-  return {
-    ...geoJSON,
-    features: fixedFeatures,
-  } as GeoJSONFeatureCollection;
-}
-
-/**
- * Get the base path for assets (handles GitHub Pages subpath)
- * Uses NEXT_PUBLIC_BASE_PATH environment variable set at build time
- */
-function getBasePath(): string {
-  return process.env.NEXT_PUBLIC_BASE_PATH || "";
-}
+// `BASE_PATH` is provided by `const/index.ts` and imported above.
 
 /**
  * Base paths for geographic data files
  */
 export const GEO_PATHS = {
-  worldLow: () => `${getBasePath()}/geo/world-110m.json`,
-  worldMedium: () => `${getBasePath()}/geo/world-50m.json`,
+  worldLow: () => `${BASE_PATH}/geo/world-110m.json`,
+  worldMedium: () => `${BASE_PATH}/geo/world-50m.json`,
   adminByCountry: (countryName: string) => {
     const filename = countryName
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "");
-    return `${getBasePath()}/geo/admin-by-country/${filename}-admin.json`;
+    return `${BASE_PATH}/geo/admin-by-country/${filename}-admin.json`;
   },
 } as const;
 
@@ -136,7 +60,7 @@ export async function loadTopoJSON(
   if ("type" in topoData && topoData.type === "Topology") {
     const topology = topoData as Topology;
     const objectKeys = Object.keys(topology.objects);
-    
+
     if (objectKeys.length === 0) {
       throw new Error("TopoJSON has no objects");
     }
@@ -145,14 +69,17 @@ export async function loadTopoJSON(
     if (!firstObjectKey) {
       throw new Error("No valid object key found in TopoJSON");
     }
-    
+
     const firstObject = topology.objects[firstObjectKey];
-    
+
     if (!firstObject) {
       throw new Error(`TopoJSON object "${firstObjectKey}" is undefined`);
     }
-    
-    geoJSON = feature(topology, firstObject as GeometryObject) as unknown as GeoJSONFeatureCollection;
+
+    geoJSON = feature(
+      topology,
+      firstObject as GeometryObject,
+    ) as unknown as GeoJSONFeatureCollection;
   } else if ("type" in topoData && topoData.type === "FeatureCollection") {
     geoJSON = topoData as GeoJSONFeatureCollection;
   } else {

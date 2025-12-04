@@ -1,18 +1,25 @@
 "use client";
 
-import React, { useMemo, memo } from "react";
-import { Source, Layer } from "react-map-gl/maplibre";
-import type { LayerProps } from "react-map-gl/maplibre";
 import type { FilterSpecification } from "maplibre-gl";
+import React, { memo, useMemo } from "react";
+import type { LayerProps } from "react-map-gl/maplibre";
+import { Layer, Source } from "react-map-gl/maplibre";
 
 // Layer style configuration
-interface LayerStyle {
+export interface LayerStyle {
   fillColor: string;
   fillOpacity: number;
   highlightColor: string;
   highlightOpacity: number;
   lineColor: string;
   lineWidth: number;
+}
+
+/** Configuration for a geographic layer level */
+export interface LevelConfig {
+  layerId: string;
+  highlightProperty: string;
+  variant: "country" | "default";
 }
 
 const DEFAULT_STYLE: LayerStyle = {
@@ -33,17 +40,18 @@ const COUNTRY_STYLE: LayerStyle = {
   lineWidth: 0.5,
 };
 
-interface GeoLayerProps {
-  /** Unique identifier for this layer */
-  id: string;
+const VARIANT_STYLES: Record<LevelConfig["variant"], LayerStyle> = {
+  default: DEFAULT_STYLE,
+  country: COUNTRY_STYLE,
+};
+
+export interface GeoLayerProps {
+  /** Level configuration containing layerId, highlightProperty, and variant */
+  levelConfig: LevelConfig;
   /** GeoJSON data to render */
   data: GeoJSON.FeatureCollection | null;
-  /** Property name to match for highlighting (e.g., "name", "name_en") */
-  highlightProperty: string;
   /** Current value to highlight (null = no highlight) */
   highlightValue: string | null;
-  /** Layer style variant */
-  variant?: "default" | "country";
   /** Custom style overrides */
   style?: Partial<LayerStyle>;
   /** Whether to show the base fill layer */
@@ -56,59 +64,77 @@ interface GeoLayerProps {
  * Memoized to prevent unnecessary re-renders.
  */
 function GeoLayerComponent({
-  id,
+  levelConfig,
   data,
-  highlightProperty,
   highlightValue,
-  variant = "default",
   style: customStyle,
   showBaseFill = true,
 }: GeoLayerProps) {
+  const { layerId: id, highlightProperty, variant } = levelConfig;
+  
+  // Use a globally stable source id to avoid MapLibre errors when the
+  // rendered layer/id switches during transitions 
+  const GLOBAL_SOURCE_ID = "react-map-poc-geo-source";
+  
   // Merge default style with variant and custom overrides
   const layerStyle = useMemo(() => {
-    const baseStyle = variant === "country" ? COUNTRY_STYLE : DEFAULT_STYLE;
+    const baseStyle = VARIANT_STYLES[variant];
     return { ...baseStyle, ...customStyle };
   }, [variant, customStyle]);
 
   // Memoize layer props to prevent re-renders
-  const baseLayerProps: LayerProps = useMemo(() => ({
-    id: `${id}-fill`,
-    type: "fill" as const,
-    paint: {
-      "fill-color": layerStyle.fillColor,
-      "fill-opacity": layerStyle.fillOpacity,
-    },
-  }), [id, layerStyle.fillColor, layerStyle.fillOpacity]);
+  const baseLayerProps: LayerProps = useMemo(
+    () => ({
+      id: `${id}-fill`,
+      type: "fill" as const,
+      paint: {
+        "fill-color": layerStyle.fillColor,
+        "fill-opacity": layerStyle.fillOpacity,
+      },
+    }),
+    [id, layerStyle.fillColor, layerStyle.fillOpacity],
+  );
 
-  const lineLayerProps: LayerProps = useMemo(() => ({
-    id: `${id}-line`,
-    type: "line" as const,
-    paint: {
-      "line-color": layerStyle.lineColor,
-      "line-width": layerStyle.lineWidth,
-    },
-  }), [id, layerStyle.lineColor, layerStyle.lineWidth]);
+  const lineLayerProps: LayerProps = useMemo(
+    () => ({
+      id: `${id}-line`,
+      type: "line" as const,
+      paint: {
+        "line-color": layerStyle.lineColor,
+        "line-width": layerStyle.lineWidth,
+      },
+    }),
+    [id, layerStyle.lineColor, layerStyle.lineWidth],
+  );
 
   // Create filter expression for highlighting - only changes when highlight changes
   const highlightFilter: FilterSpecification = useMemo(
     () => ["==", ["get", highlightProperty], highlightValue || ""],
-    [highlightProperty, highlightValue]
+    [highlightProperty, highlightValue],
   );
 
-  const highlightLayerProps: LayerProps = useMemo(() => ({
-    id: `${id}-highlight`,
-    type: "fill" as const,
-    paint: {
-      "fill-color": layerStyle.highlightColor,
-      "fill-opacity": layerStyle.highlightOpacity,
-    },
-    filter: highlightFilter,
-  }), [id, layerStyle.highlightColor, layerStyle.highlightOpacity, highlightFilter]);
+  const highlightLayerProps: LayerProps = useMemo(
+    () => ({
+      id: `${id}-highlight`,
+      type: "fill" as const,
+      paint: {
+        "fill-color": layerStyle.highlightColor,
+        "fill-opacity": layerStyle.highlightOpacity,
+      },
+      filter: highlightFilter,
+    }),
+    [
+      id,
+      layerStyle.highlightColor,
+      layerStyle.highlightOpacity,
+      highlightFilter,
+    ],
+  );
 
   if (!data) return null;
 
   return (
-    <Source id={id} type="geojson" data={data}>
+    <Source id={GLOBAL_SOURCE_ID} type="geojson" data={data}>
       {showBaseFill && <Layer {...baseLayerProps} />}
       {highlightValue && <Layer {...highlightLayerProps} />}
       <Layer {...lineLayerProps} />
@@ -119,6 +145,3 @@ function GeoLayerComponent({
 // Memoize the entire component - only re-render when props actually change
 const GeoLayer = memo(GeoLayerComponent);
 export default GeoLayer;
-
-// Export types for external use
-export type { GeoLayerProps, LayerStyle };
