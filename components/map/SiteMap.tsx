@@ -195,8 +195,16 @@ const SiteMap = forwardRef<SiteMapHandle, SiteMapProps>(function SiteMap(
   // Load data when focus level changes
   // ---------------------------------------------------------------------------
 
+  // Track the parent entity name that determines which data to load
+  // For level 1, this is the country we clicked (entityStack[0])
+  // For level 2+, this is the entity at level-1 (e.g., country name for admin-2)
+  const parentEntityForLoading = focusLevel >= 1 ? entityStack[focusLevel - 1]?.name : undefined;
+
   useEffect(() => {
+    console.log('[useEffect:loadData] Triggered:', { focusLevel, parentEntityForLoading, entityStack });
+    
     if (focusLevel === 0) {
+      console.log('[useEffect:loadData] Level 0, clearing focused feature');
       setFocusedFeature(null);
       return;
     }
@@ -217,12 +225,19 @@ const SiteMap = forwardRef<SiteMapHandle, SiteMapProps>(function SiteMap(
       return;
     }
 
+    // Always reload when parent entity changes - clear existing data first
+    // This handles switching from US states to France states
+    setDataByLevel(prev => ({ ...prev, [focusLevel]: null }));
+
     let mounted = true;
     (async () => {
       setIsLoading(true);
       try {
-        // Get parent entity for loading
-        const parentEntity = entityStack[focusLevel - 1]?.name;
+        // Get parent entity for loading - for level 1, use the clicked country name
+        // For level 2+, use the parent from the stack
+        const parentEntity = focusLevel === 1 
+          ? entityStack[0]?.name 
+          : entityStack[focusLevel - 2]?.name;
         const data = await config.getDataLoader(parentEntity);
 
         if (!mounted) return;
@@ -267,7 +282,7 @@ const SiteMap = forwardRef<SiteMapHandle, SiteMapProps>(function SiteMap(
     })();
 
     return () => { mounted = false; };
-  }, [focusLevel, entityStack]);
+  }, [focusLevel, parentEntityForLoading]);
 
   // ---------------------------------------------------------------------------
   // Helper: Fit map to bounds
@@ -341,20 +356,41 @@ const SiteMap = forwardRef<SiteMapHandle, SiteMapProps>(function SiteMap(
 
       setIsTransitioning(true);
       
-      // Update entity stack
       const newStack = entityStack.slice(0, targetLevel - 1);
-      newStack.push({ name: entityName, level: targetLevel });
-      
-      setEntityStack(newStack);
-      setFocusLevel(targetLevel);
+      let lastEntity = newStack.length > 0 ? newStack[newStack.length - 1] : null;
+      if (lastEntity && lastEntity.level === focusLevel) {
+        newStack[newStack.length - 1] = { name: entityName, level: focusLevel };
+        setEntityStack(newStack);
+      } else {
+        newStack.push({ name: entityName, level: targetLevel });
+        setEntityStack(newStack);
+        setFocusLevel(targetLevel);
+      }
     },
 
     goBack: () => {
+      console.log('[goBack] Current state:', { focusLevel, entityStack, effectiveDataLevel, dataByLevel: Object.keys(dataByLevel) });
+      
       if (focusLevel <= 0) return;
       
       setIsTransitioning(true);
+      
+      // Go back one level from current focus level
       const newLevel = focusLevel - 1;
-      const newStack = entityStack.slice(0, newLevel);
+      
+      // Keep only entities with level <= newLevel
+      const newStack = entityStack.filter(e => e.level <= newLevel);
+      
+      // Clear data for levels above newLevel to prevent lingering
+      setDataByLevel(prev => {
+        const updated = { ...prev };
+        for (let i = newLevel + 1; i <= MAX_FOCUS_LEVEL; i++) {
+          delete updated[i];
+        }
+        return updated;
+      });
+      
+      console.log('[goBack] New state:', { newLevel, newStack });
       
       setEntityStack(newStack);
       setFocusLevel(newLevel);
@@ -368,7 +404,7 @@ const SiteMap = forwardRef<SiteMapHandle, SiteMapProps>(function SiteMap(
           duration: 500,
         });
       } else {
-        // Find the most recent level with data and fit to it
+        // Fit to the data at the new level (or nearest available)
         for (let level = newLevel; level >= 0; level--) {
           const levelData = dataByLevel[level];
           if (levelData) {
@@ -423,21 +459,52 @@ const SiteMap = forwardRef<SiteMapHandle, SiteMapProps>(function SiteMap(
 
     onFeatureClick?.({ name, level: focusLevel });
 
-    // Always allow drilling down up to MAX_FOCUS_LEVEL
-    const nextLevel = focusLevel + 1;
+    console.log('[handleClick] Before:', { focusLevel, entityStack, effectiveDataLevel, name });
+
+    // Determine the next level based on what we're currently viewing
+    // If we're viewing fallback data (effectiveDataLevel < focusLevel), clicking should try to drill down from effective level
+    const currentViewLevel = effectiveDataLevel;
+    const nextLevel = currentViewLevel + 1;
+    
     if (nextLevel <= MAX_FOCUS_LEVEL) {
       setIsTransitioning(true);
       
       // Store the clicked feature for zooming
       setFocusedFeature(feature);
       
-      const newStack = [...entityStack];
-      newStack.push({ name, level: nextLevel });
+      // Check if we tried to drill down before but couldn't (focusLevel > effectiveDataLevel)
+      // In that case, clicking another feature at the same visible level is a reselection
+      const wasAtFallbackLevel = focusLevel > effectiveDataLevel;
       
-      setEntityStack(newStack);
-      setFocusLevel(nextLevel);
+      if (wasAtFallbackLevel) {
+        // We're reselecting within the fallback level - replace the entity that failed to drill down
+        // Keep entities up to the effective level, replace/add the one for the next level attempt
+        const newStack = entityStack.filter(e => e.level < nextLevel);
+        newStack.push({ name, level: nextLevel });
+        
+        console.log('[handleClick] Reselecting (was at fallback):', { newStack, nextLevel, wasAtFallbackLevel });
+        
+        setEntityStack(newStack);
+        setFocusLevel(nextLevel);
+        
+        // Just zoom to the new feature since we know there's no data at nextLevel
+        const featureCollection = {
+          type: "FeatureCollection" as const,
+          features: [feature],
+        };
+        fitToBounds(featureCollection as GeoJSONFeatureCollection);
+        setTimeout(() => setIsTransitioning(false), 500);
+      } else {
+        // Normal drill-down: add new entity and advance level
+        const newStack = [...entityStack, { name, level: nextLevel }];
+        
+        console.log('[handleClick] Drill down:', { newStack, nextLevel });
+        
+        setEntityStack(newStack);
+        setFocusLevel(nextLevel);
+      }
     }
-  }, [focusLevel, entityStack, isTransitioning, isLoading, onFeatureClick]);
+  }, [focusLevel, entityStack, effectiveDataLevel, isTransitioning, isLoading, onFeatureClick, fitToBounds]);
 
   const handleMouseMove = useCallback((event: any) => {
     const map = mapRef.current?.getMap();
