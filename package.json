@@ -9,7 +9,8 @@
     "lint:fix": "eslint . --ext .ts,.tsx,.jsx --fix",
     "build": "next build",
     "start": "next start",
-    "verify": "node scripts/verify-setup.js"
+    "verify": "node scripts/verify-setup.js",
+    "backend": "backend/.venv/bin/uvicorn backend.src.main:app --reload --port 8000"
   },
   "dependencies": {
     "@mantine/core": "^8.3.8",
