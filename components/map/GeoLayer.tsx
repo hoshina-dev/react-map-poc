@@ -1,7 +1,7 @@
 "use client";
 
 import type { FilterSpecification } from "maplibre-gl";
-import React, { memo, useMemo } from "react";
+import { memo, useMemo } from "react";
 import type { LayerProps } from "react-map-gl/maplibre";
 import { Layer, Source } from "react-map-gl/maplibre";
 

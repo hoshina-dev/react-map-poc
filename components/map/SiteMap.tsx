@@ -13,20 +13,20 @@ import React, {
 } from "react";
 import type { MapRef } from "react-map-gl/maplibre";
 import MapGL from "react-map-gl/maplibre";
-import { bbox } from "@turf/turf";
 
-import { getMapConfig, clampCoordinates } from "@/lib/mapConfig";
-import { loadWorldMap, loadAdminBoundaries } from "@/lib/geoDataService";
+import { getMapConfig } from "@/lib/mapConfig";
+import { calculateFitBounds } from "@/lib/mapUtils";
+import { loadWorldMap, loadAdminBoundaries } from "@/lib/geoDataProvider";
 import type { ViewState, GeoJSONFeatureCollection } from "@/types/map";
 import GeoLayer from "./GeoLayer";
 import type { LevelConfig } from "./GeoLayer";
 
-// Re-export LevelConfig for external use
-export type { LevelConfig };
-
 // -----------------------------------------------------------------------------
 // Types
 // -----------------------------------------------------------------------------
+
+// Re-export LevelConfig for external use
+export type { LevelConfig };
 
 /** Maximum focus level supported (0 = world, 1 = country/admin0, 2 = admin1, etc.) */
 export const MAX_FOCUS_LEVEL = 4;
@@ -62,6 +62,8 @@ export interface SiteMapProps {
   onHover?: (name: string | null) => void;
   /** Called when focus state changes */
   onFocusChange?: (state: FocusState) => void;
+  /** Called when the map view state changes (zoom, pan, etc.) */
+  onViewStateChange?: (viewState: ViewState) => void;
 }
 
 export interface SiteMapHandle {
@@ -97,7 +99,7 @@ const LEVEL_CONFIGS: Record<number, LevelConfigWithLoader> = {
   },
   1: {
     layerId: "admin-boundaries-1",
-    highlightProperty: "name_en",
+    highlightProperty: "name",
     variant: "default",
     getDataLoader: async (country) => country ? loadAdminBoundaries(country) : null,
   },
@@ -130,6 +132,7 @@ const SiteMap = forwardRef<SiteMapHandle, SiteMapProps>(function SiteMap(
     onFeatureClick,
     onHover,
     onFocusChange,
+    onViewStateChange,
   },
   ref
 ) {
@@ -259,16 +262,9 @@ const SiteMap = forwardRef<SiteMapHandle, SiteMapProps>(function SiteMap(
           return;
         }
 
-        // Add IDs to features for hover
-        const withIds = {
-          ...data,
-          features: data.features.map((f: any, i: number) => ({ ...f, id: i })),
-        };
-
         // Compute and fit to bounds
-        fitToBounds(withIds);
-
-        setDataByLevel((prev) => ({ ...prev, [focusLevel]: withIds }));
+        fitToBounds(data);
+        setDataByLevel((prev) => ({ ...prev, [focusLevel]: data }));
         setIsLoading(false);
         setTimeout(() => setIsTransitioning(false), 300);
       } catch (err) {
@@ -289,32 +285,8 @@ const SiteMap = forwardRef<SiteMapHandle, SiteMapProps>(function SiteMap(
   // ---------------------------------------------------------------------------
 
   const fitToBounds = useCallback((data: GeoJSONFeatureCollection) => {
-    let [minLng, minLat, maxLng, maxLat] = bbox(data) as [number, number, number, number];
-
-    // Handle antimeridian crossing
-    if (maxLng - minLng > 180) {
-      const mainFeatures = data.features.filter((f: any) => {
-        try {
-          const fb = bbox(f) as [number, number, number, number];
-          if (fb[2] - fb[0] > 180) return false;
-          const centerLng = (fb[0] + fb[2]) / 2;
-          return centerLng > -130 && centerLng < 170;
-        } catch {
-          return false;
-        }
-      });
-      if (mainFeatures.length) {
-        [minLng, minLat, maxLng, maxLat] = bbox({ type: "FeatureCollection", features: mainFeatures }) as [number, number, number, number];
-      }
-    }
-
-    // Apply padding
-    const lngPad = (maxLng - minLng) * 0.05;
-    const latPad = (maxLat - minLat) * 0.05;
-    const [cMinLng, cMinLat] = clampCoordinates(minLng - lngPad, minLat - latPad);
-    const [cMaxLng, cMaxLat] = clampCoordinates(maxLng + lngPad, maxLat + latPad);
-
-    mapRef.current?.getMap()?.fitBounds([[cMinLng, cMinLat], [cMaxLng, cMaxLat]], {
+    const bounds = calculateFitBounds(data, 0.05);
+    mapRef.current?.getMap()?.fitBounds(bounds, {
       padding: 50,
       duration: 500,
     });
@@ -444,7 +416,10 @@ const SiteMap = forwardRef<SiteMapHandle, SiteMapProps>(function SiteMap(
 
   const handleMove = useCallback((evt: { viewState: ViewState }) => {
     setViewState(evt.viewState);
-  }, []);
+    if (typeof onViewStateChange === 'function') {
+      onViewStateChange(evt.viewState);
+    }
+  }, [onViewStateChange]);
 
   const handleClick = useCallback((event: any) => {
     if (isTransitioning || isLoading) return;
@@ -454,7 +429,7 @@ const SiteMap = forwardRef<SiteMapHandle, SiteMapProps>(function SiteMap(
 
     const feature = features[0];
     const props = feature.properties;
-    const name = props?.name_en || props?.name || props?.admin;
+    const name = props?.name; // Now using normalized 'name' property
     if (!name) return;
 
     onFeatureClick?.({ name, level: focusLevel });
@@ -513,7 +488,7 @@ const SiteMap = forwardRef<SiteMapHandle, SiteMapProps>(function SiteMap(
     const features = event.features;
     if (features?.length) {
       const props = features[0].properties;
-      const name = props?.name_en || props?.name || props?.admin;
+      const name = props?.name; // Now using normalized 'name' property
       if (name && name !== hoveredRegion) {
         setHoveredRegion(name);
         onHover?.(name);
@@ -532,10 +507,6 @@ const SiteMap = forwardRef<SiteMapHandle, SiteMapProps>(function SiteMap(
     const canvas = mapRef.current?.getMap()?.getCanvas();
     if (canvas) canvas.style.cursor = "";
   }, [onHover]);
-
-  // ---------------------------------------------------------------------------
-  // Render
-  // ---------------------------------------------------------------------------
 
   return (
     <MapGL

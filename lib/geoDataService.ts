@@ -1,5 +1,7 @@
 /**
- * Service for loading and managing geographic data
+ * Service for loading and managing geographic data (LEGACY)
+ * 
+ * This file is now used as a fallback by geoDataProvider.ts
  * Handles TopoJSON to GeoJSON conversion and caching
  */
 
@@ -16,10 +18,6 @@ const geoCache = new Map<
   { data: GeoJSONFeatureCollection; loadedAt: number }
 >();
 
-// Antimeridian fixing is provided by `lib/geoUtils.ts` and imported above.
-
-// `BASE_PATH` is provided by `const/index.ts` and imported above.
-
 /**
  * Base paths for geographic data files
  */
@@ -34,6 +32,75 @@ export const GEO_PATHS = {
     return `${BASE_PATH}/geo/admin-by-country/${filename}-admin.json`;
   },
 } as const;
+
+/**
+ * Normalize raw data: convert TopoJSON to GeoJSON if needed,
+ * fix antimeridian, and clean properties to minimal format.
+ * Used by both backend responses and local file fallback.
+ */
+export function normalizeGeoData(rawData: any): GeoJSONFeatureCollection {
+  let geoData: any = rawData;
+
+  // Convert TopoJSON to GeoJSON if necessary
+  if (geoData && geoData.type === "Topology") {
+    const topology = geoData as Topology;
+    const objectKeys = Object.keys(topology.objects || {});
+    
+    if (objectKeys.length === 0) {
+      throw new Error("TopoJSON has no objects");
+    }
+    
+    const firstObjectKey = objectKeys[0];
+    if (!firstObjectKey) {
+      throw new Error("No valid object key found in TopoJSON");
+    }
+    
+    const firstObject = topology.objects[firstObjectKey];
+    if (!firstObject) {
+      throw new Error(`TopoJSON object "${firstObjectKey}" is undefined`);
+    }
+    
+    geoData = feature(
+      topology,
+      firstObject as GeometryObject
+    ) as unknown as GeoJSONFeatureCollection;
+  } else if (geoData && geoData.type === "FeatureCollection") {
+    geoData = geoData as GeoJSONFeatureCollection;
+  } else {
+    throw new Error("Input data is not a valid GeoJSON or TopoJSON object.");
+  }
+
+  // Fix antimeridian crossing
+  geoData = fixAntimeridianCrossing(geoData);
+
+  // Normalize properties: keep only name and geometry, add sequential IDs
+  const cleanedFeatures = geoData.features.map((feat: any, i: number) => {
+    const props = feat.properties || {};
+    const name =
+      props.name ||
+      props.name_en ||
+      props.NAME ||
+      props.admin ||
+      props.NAME_EN ||
+      props.name_long ||
+      props.brk_name ||
+      props.formal_en ||
+      props.gn_name ||
+      "Unknown";
+
+    return {
+      type: feat.type,
+      id: typeof feat.id === "number" || typeof feat.id === "string" ? feat.id : i,
+      geometry: feat.geometry,
+      properties: { name },
+    };
+  });
+
+  return {
+    type: "FeatureCollection",
+    features: cleanedFeatures,
+  } as GeoJSONFeatureCollection;
+}
 
 /**
  * Loads and parses a TopoJSON file, converting it to GeoJSON FeatureCollection
@@ -52,42 +119,8 @@ export async function loadTopoJSON(
     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
   }
 
-  const topoData: Topology | GeoJSONFeatureCollection = await response.json();
-
-  // Convert TopoJSON to GeoJSON
-  let geoJSON: GeoJSONFeatureCollection;
-
-  if ("type" in topoData && topoData.type === "Topology") {
-    const topology = topoData as Topology;
-    const objectKeys = Object.keys(topology.objects);
-
-    if (objectKeys.length === 0) {
-      throw new Error("TopoJSON has no objects");
-    }
-
-    const firstObjectKey = objectKeys[0];
-    if (!firstObjectKey) {
-      throw new Error("No valid object key found in TopoJSON");
-    }
-
-    const firstObject = topology.objects[firstObjectKey];
-
-    if (!firstObject) {
-      throw new Error(`TopoJSON object "${firstObjectKey}" is undefined`);
-    }
-
-    geoJSON = feature(
-      topology,
-      firstObject as GeometryObject,
-    ) as unknown as GeoJSONFeatureCollection;
-  } else if ("type" in topoData && topoData.type === "FeatureCollection") {
-    geoJSON = topoData as GeoJSONFeatureCollection;
-  } else {
-    throw new Error(`Unsupported data format`);
-  }
-
-  // Fix antimeridian crossing issues (Russia, Fiji, Antarctica, etc.)
-  geoJSON = fixAntimeridianCrossing(geoJSON);
+  const rawData = await response.json();
+  const geoJSON = normalizeGeoData(rawData);
 
   // Cache the result
   geoCache.set(path, {
@@ -98,9 +131,6 @@ export async function loadTopoJSON(
   return geoJSON;
 }
 
-/**
- * Loads the world base map
- */
 export async function loadWorldMap(): Promise<GeoJSONFeatureCollection> {
   try {
     return await loadTopoJSON(GEO_PATHS.worldLow());
@@ -112,9 +142,6 @@ export async function loadWorldMap(): Promise<GeoJSONFeatureCollection> {
   }
 }
 
-/**
- * Loads admin boundaries for a specific country
- */
 export async function loadAdminBoundaries(
   countryName: string,
 ): Promise<GeoJSONFeatureCollection | null> {
@@ -130,16 +157,10 @@ export async function loadAdminBoundaries(
   }
 }
 
-/**
- * Clears the geo data cache
- */
 export function clearCache(): void {
   geoCache.clear();
 }
 
-/**
- * Gets cache statistics
- */
 export function getCacheStats() {
   return {
     size: geoCache.size,
