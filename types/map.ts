@@ -37,10 +37,18 @@ export type GeoJSONFeatureCollection = FeatureCollection<
 
 export interface CountryProperties {
   name?: string;
+  name_en?: string;
+  name_long?: string;
   admin?: string;
+  brk_name?: string;
+  formal_en?: string;
+  gn_name?: string;
+  NAME?: string;
+  NAME_EN?: string;
   iso_a2?: string;
   iso_a3?: string;
   iso_n3?: string;
+  [key: string]: any; // Allow other properties from geojson data
 }
 
 export interface MapStyleConfig {

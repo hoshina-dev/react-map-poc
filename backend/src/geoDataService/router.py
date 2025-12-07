@@ -16,40 +16,30 @@ async def read_bytes(path: str) -> bytes:
         return await f.read()
 
 
-@router.get("/world")
-async def get_world():
+@router.get("/world", response_model=None)
+async def get_world() -> Response | JSONResponse:
     try:
         p = database.world_file_path()
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="world geo file not found")
-
-    gz = p + '.gz'
-    if os.path.exists(gz):
-        content = await read_bytes(gz)
-        return Response(content=content, media_type=GEO_MEDIA_TYPE, headers={"Content-Encoding": "gzip"})
-
     try:
         data = read_json_sync(p)
-        return JSONResponse(content=data)
+        cleaned_data = database.clean_geojson(data)
+        return JSONResponse(content=cleaned_data)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/admin/{country}")
-async def get_admin(country: str):
+@router.get("/admin/{country}", response_model=None)
+async def get_admin(country: str) -> Response | JSONResponse:
     try:
         p = database.admin_file_path(country)
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="admin geo file not found")
-
-    gz = p + '.gz'
-    if os.path.exists(gz):
-        content = await read_bytes(gz)
-        return Response(content=content, media_type=GEO_MEDIA_TYPE, headers={"Content-Encoding": "gzip"})
-
     try:
         data = read_json_sync(p)
-        return JSONResponse(content=data)
+        cleaned_data = database.clean_geojson(data)
+        return JSONResponse(content=cleaned_data)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -97,6 +87,6 @@ async def meta_admin(country: str) -> JSONResponse:
 
 
 @router.get("/list/admins", response_model=AdminListResponse)
-async def list_admins():
+async def list_admins() -> JSONResponse:
     countries = database.list_admin_countries()
     return JSONResponse(content={"countries": countries})

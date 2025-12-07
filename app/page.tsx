@@ -16,13 +16,19 @@ const DEFAULT_FOCUS_STATE: FocusState = {
 };
 
 export default function Home() {
+
   const mapRef = useRef<SiteMapHandle>(null);
   const [focusState, setFocusState] = useState<FocusState>(DEFAULT_FOCUS_STATE);
-  const [zoom, setZoom] = useState(2);
+  const [zoom, setZoom] = useState<number>(2);
 
   const handleFocusChange = useCallback((state: FocusState) => {
     setFocusState(state);
   }, []);
+
+  const handleViewStateChange = useCallback((viewState: { zoom: number }) => {
+    setZoom(viewState.zoom);
+  }, []);
+
 
   return (
     <Container size="xl" py="xl">
@@ -50,6 +56,7 @@ export default function Home() {
           mapProvider="positron"
           style={{ width: "100%", maxWidth: 1200, height: 600, borderRadius: 8 }}
           onFocusChange={handleFocusChange}
+          onViewStateChange={handleViewStateChange}
         />
       </Flex>
     </Container>

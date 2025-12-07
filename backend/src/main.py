@@ -16,6 +16,11 @@ app.add_middleware(
 	allow_headers=["*"],
 )
 
-# Mount the geo router under /api (router prefix defines /geo)
+# Health check endpoint
+@app.get("/health")
+async def health_check():
+	return {"status": "ok", "service": "geo-api"}
+
 app.include_router(geo_router, prefix="/api")
+
 

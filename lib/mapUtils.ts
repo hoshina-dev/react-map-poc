@@ -4,7 +4,8 @@
 
 import { bbox, center } from "@turf/turf";
 
-import type { GeoJSONFeature, ViewState } from "@/types/map";
+import type { GeoJSONFeature, GeoJSONFeatureCollection, ViewState } from "@/types/map";
+import { clampCoordinates } from "./mapConfig";
 
 /**
  * Gets the center coordinates of a GeoJSON feature
@@ -138,4 +139,43 @@ export function calculateViewForFocus(
     pitch: 0,
     bearing: 0,
   };
+}
+
+/**
+ * Calculates optimal bounds for a GeoJSON FeatureCollection with antimeridian handling
+ * Returns bounds that can be passed to map.fitBounds()
+ */
+export function calculateFitBounds(
+  data: GeoJSONFeatureCollection,
+  padding: number = 0.05
+): [[number, number], [number, number]] {
+  let [minLng, minLat, maxLng, maxLat] = bbox(data) as [number, number, number, number];
+
+  // Handle antimeridian crossing (e.g., Russia, Fiji)
+  if (maxLng - minLng > 180) {
+    const mainFeatures = data.features.filter((f: any) => {
+      try {
+        const fb = bbox(f) as [number, number, number, number];
+        if (fb[2] - fb[0] > 180) return false;
+        const centerLng = (fb[0] + fb[2]) / 2;
+        return centerLng > -130 && centerLng < 170;
+      } catch {
+        return false;
+      }
+    });
+    if (mainFeatures.length) {
+      [minLng, minLat, maxLng, maxLat] = bbox({ 
+        type: "FeatureCollection", 
+        features: mainFeatures 
+      }) as [number, number, number, number];
+    }
+  }
+
+  // Apply padding as percentage of range
+  const lngPad = (maxLng - minLng) * padding;
+  const latPad = (maxLat - minLat) * padding;
+  const [cMinLng, cMinLat] = clampCoordinates(minLng - lngPad, minLat - latPad);
+  const [cMaxLng, cMaxLat] = clampCoordinates(maxLng + lngPad, maxLat + latPad);
+
+  return [[cMinLng, cMinLat], [cMaxLng, cMaxLat]];
 }
