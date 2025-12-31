@@ -1,67 +1,67 @@
-"use client";
-
-import { Box, Container, Flex, Text, Title } from "@mantine/core";
-import { useCallback, useRef, useState } from "react";
+import { Button, Flex, SimpleGrid, Stack, Text, Title } from "@mantine/core";
 
 import { ColorSchemeToggle } from "@/components/demo/ColorSchemeToggle";
-import type { FocusState, SiteMapHandle } from "@/components/map";
-import { MapInfoBar, SiteMap } from "@/components/map";
-import { BASE_PATH } from "@/const";
+import { PopoverDemo } from "@/components/demo/PopoverDemo";
+import { Welcome } from "@/components/demo/Welcome";
 
-const DEFAULT_FOCUS_STATE: FocusState = {
-  level: 0,
-  entityStack: [],
-  hoveredRegion: null,
-  isLoading: false,
-};
+const DEMOS = [
+  {
+    title: "Interactive Map",
+    href: "/demo/map",
+    description:
+      "Explore the interactive map with drill-down navigation. Click countries to zoom into admin boundaries (states/provinces), select regions, and smoothly navigate back.",
+  },
+  {
+    title: "Admin Areas GraphQL",
+    href: "/demo/admin-areas",
+    description:
+      "View raw GraphQL query results for admin areas at different levels. Useful for debugging and understanding the API response structure.",
+  },
+];
 
 export default function Home() {
-  const mapRef = useRef<SiteMapHandle>(null);
-  const [focusState, setFocusState] = useState<FocusState>(DEFAULT_FOCUS_STATE);
-  const [zoom, setZoom] = useState<number>(2);
-
-  const handleFocusChange = useCallback((state: FocusState) => {
-    setFocusState(state);
-  }, []);
-
-  const handleViewStateChange = useCallback((viewState: { zoom: number }) => {
-    setZoom(viewState.zoom);
-  }, []);
-
   return (
-    <Container size="xl" py="xl">
-      <Flex direction="column" align="center" gap="xl">
-        <ColorSchemeToggle />
-        <Title order={1}>Interactive World Map</Title>
-        {BASE_PATH === "/react-map-poc" ? (
-          <Text c="dimmed" size="sm">
-            Focus mode works for USA, Thailand, and Japan
-          </Text>
-        ) : (
-          <Text c="dimmed" size="sm">
-            Click a country to focus
-          </Text>
-        )}
+    <Stack gap="xl" py="xl" px="md">
+      <Welcome />
 
-        {/* Info Bar */}
-        <Box w="100%" maw={1200}>
-          <MapInfoBar focusState={focusState} mapRef={mapRef} zoom={zoom} />
-        </Box>
+      <Stack gap="md" align="center">
+        <Title order={2} ta="center">
+          Demos
+        </Title>
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" maw={1200} w="100%">
+          {DEMOS.map((demo) => (
+            <Stack
+              key={demo.href}
+              gap="md"
+              p="md"
+              style={{
+                border: "1px solid var(--mantine-color-gray-3)",
+                borderRadius: "var(--mantine-radius-md)",
+              }}
+            >
+              <div>
+                <Title order={3} size="h5">
+                  {demo.title}
+                </Title>
+                <Text size="sm" c="dimmed">
+                  {demo.description}
+                </Text>
+              </div>
+              <Button component="a" href={demo.href} variant="light" fullWidth>
+                Open Demo
+              </Button>
+            </Stack>
+          ))}
+        </SimpleGrid>
+      </Stack>
 
-        {/* Map */}
-        <SiteMap
-          ref={mapRef}
-          mapProvider="positron"
-          style={{
-            width: "100%",
-            maxWidth: 1200,
-            height: 600,
-            borderRadius: 8,
-          }}
-          onFocusChange={handleFocusChange}
-          onViewStateChange={handleViewStateChange}
-        />
+      <Flex direction="column" align="center" gap="md">
+        <Title order={3}>Components</Title>
+        <Flex gap="md" wrap="wrap" justify="center">
+          <ColorSchemeToggle />
+          <PopoverDemo />
+        </Flex>
       </Flex>
-    </Container>
+    </Stack>
   );
 }
