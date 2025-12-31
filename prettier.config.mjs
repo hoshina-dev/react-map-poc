@@ -1,3 +1,6 @@
 // @ts-check
 
-export default {};
+/** @satisfies {import("prettier").Config} */
+const config = {};
+
+export default config;

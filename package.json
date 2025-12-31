@@ -8,11 +8,12 @@
     "format": "eslint . --ext .ts,.tsx,.jsx,.js,.cjs --fix",
     "build": "next build",
     "start": "next start",
+    "check": "next typegen && tsc --noEmit",
     "codegen": "graphql-codegen --config codegen.ts"
   },
   "dependencies": {
     "@apollo/client": "^4.0.11",
-    "@hoshina/react-map": "link:../react-map",
+    "@hoshina/react-map": "^0.1.0",
     "@mantine/core": "^8.3.8",
     "@mantine/hooks": "^8.3.8",
     "@turf/turf": "^7.3.0",
