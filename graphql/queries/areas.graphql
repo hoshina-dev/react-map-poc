@@ -1,0 +1,21 @@
+query AdminAreas($adminLevel: Int!) {
+  adminAreas(adminLevel: $adminLevel) {
+    id
+    name
+    isoCode
+    geometry
+    adminLevel
+    parentCode
+  }
+}
+
+query ChildrenByCode($parentCode: String!, $childLevel: Int!) {
+  childrenByCode(parentCode: $parentCode, childLevel: $childLevel) {
+    id
+    name
+    isoCode
+    geometry
+    adminLevel
+    parentCode
+  }
+}

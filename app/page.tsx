@@ -4,8 +4,8 @@ import { Box, Container, Flex, Text, Title } from "@mantine/core";
 import { useCallback, useRef, useState } from "react";
 
 import { ColorSchemeToggle } from "@/components/demo/ColorSchemeToggle";
-import { MapInfoBar, SiteMap } from "@/components/map";
 import type { FocusState, SiteMapHandle } from "@/components/map";
+import { MapInfoBar, SiteMap } from "@/components/map";
 import { BASE_PATH } from "@/const";
 
 const DEFAULT_FOCUS_STATE: FocusState = {
@@ -16,7 +16,6 @@ const DEFAULT_FOCUS_STATE: FocusState = {
 };
 
 export default function Home() {
-
   const mapRef = useRef<SiteMapHandle>(null);
   const [focusState, setFocusState] = useState<FocusState>(DEFAULT_FOCUS_STATE);
   const [zoom, setZoom] = useState<number>(2);
@@ -28,7 +27,6 @@ export default function Home() {
   const handleViewStateChange = useCallback((viewState: { zoom: number }) => {
     setZoom(viewState.zoom);
   }, []);
-
 
   return (
     <Container size="xl" py="xl">
@@ -54,7 +52,12 @@ export default function Home() {
         <SiteMap
           ref={mapRef}
           mapProvider="positron"
-          style={{ width: "100%", maxWidth: 1200, height: 600, borderRadius: 8 }}
+          style={{
+            width: "100%",
+            maxWidth: 1200,
+            height: 600,
+            borderRadius: 8,
+          }}
           onFocusChange={handleFocusChange}
           onViewStateChange={handleViewStateChange}
         />
