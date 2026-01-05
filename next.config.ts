@@ -2,13 +2,12 @@
 
 /** @type {import("next").NextConfig} */
 const nextConfig = {
-  output: "export",
+  output: "standalone",
   images: {
     unoptimized: true,
   },
   basePath: process.env.NEXT_PUBLIC_BASE_PATH || "",
   assetPrefix: process.env.NEXT_PUBLIC_BASE_PATH || "",
-  transpilePackages: ["@hoshina/react-map"],
 };
 
 export default nextConfig;
