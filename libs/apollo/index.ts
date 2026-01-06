@@ -1,2 +1,1 @@
-export { getApolloClient, resetApolloClient } from "./client";
-export { ApolloProvider } from "./provider";
+export { getServerApolloClient } from "./client";

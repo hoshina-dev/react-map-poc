@@ -11,12 +11,6 @@ const DEMOS = [
     description:
       "Explore the interactive map with drill-down navigation. Click countries to zoom into admin boundaries (states/provinces), select regions, and smoothly navigate back.",
   },
-  {
-    title: "Admin Areas GraphQL",
-    href: "/demo/admin-areas",
-    description:
-      "View raw GraphQL query results for admin areas at different levels. Useful for debugging and understanding the API response structure.",
-  },
 ];
 
 export default function Home() {
@@ -28,7 +22,7 @@ export default function Home() {
         <Title order={2} ta="center">
           Demos
         </Title>
-        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" maw={1200} w="100%">
+        <SimpleGrid cols={{ base: 1, sm: 1 }} spacing="md" maw={600} w="100%">
           {DEMOS.map((demo) => (
             <Stack
               key={demo.href}

@@ -3,7 +3,6 @@
 import { MantineProvider } from "@mantine/core";
 import type { ReactNode } from "react";
 
-import { ApolloProvider } from "@/libs/apollo";
 import { theme } from "@/libs/theme";
 
 interface ProvidersProps {
@@ -11,9 +10,5 @@ interface ProvidersProps {
 }
 
 export function Providers({ children }: ProvidersProps) {
-  return (
-    <ApolloProvider>
-      <MantineProvider theme={theme}>{children}</MantineProvider>
-    </ApolloProvider>
-  );
+  return <MantineProvider theme={theme}>{children}</MantineProvider>;
 }

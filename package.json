@@ -1,6 +1,6 @@
 {
   "name": "@hoshina/react-map-poc",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@apollo/client": "^4.0.11",
-    "@hoshina/react-map": "^0.1.0",
+    "@hoshina/react-map": "^0.2.0",
     "@mantine/core": "^8.3.8",
     "@mantine/hooks": "^8.3.8",
     "@turf/turf": "^7.3.0",
@@ -23,6 +23,7 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-map-gl": "^8.1.0",
+    "server-only": "^0.0.1",
     "topojson-client": "^3.1.0"
   },
   "devDependencies": {
