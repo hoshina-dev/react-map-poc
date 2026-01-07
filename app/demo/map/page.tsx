@@ -13,7 +13,7 @@ import { useRef, useState } from "react";
 import { mapDataLoader } from "@/libs/map/geoDataLoader";
 
 // Create level configurations with injected data loader
-const LEVEL_CONFIGS = createStandardLevelConfigs(mapDataLoader, 1);
+const LEVEL_CONFIGS = createStandardLevelConfigs(mapDataLoader, 2);
 
 export default function MapDemoPage() {
   const mapRef = useRef<SiteMapHandle>(null);
@@ -51,7 +51,7 @@ export default function MapDemoPage() {
           <SiteMap
             ref={mapRef}
             levelConfigs={LEVEL_CONFIGS}
-            maxLevel={1}
+            maxLevel={2}
             onEntityChange={setFocusedEntity}
             onHover={setHoveredFeature}
             onFeatureSelect={setSelectedFeature}

@@ -1,6 +1,6 @@
 {
   "name": "@hoshina/react-map-poc",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -13,9 +13,9 @@
   },
   "dependencies": {
     "@apollo/client": "^4.0.11",
-    "@hoshina/react-map": "^0.2.0",
-    "@mantine/core": "^8.3.8",
-    "@mantine/hooks": "^8.3.8",
+    "@hoshina/react-map": "^0.3.0",
+    "@mantine/core": "^8.3.11",
+    "@mantine/hooks": "^8.3.11",
     "@turf/turf": "^7.3.0",
     "graphql": "^16.12.0",
     "maplibre-gl": "^5.13.0",
@@ -41,16 +41,16 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.1",
-    "eslint-plugin-turbo": "^2.6.1",
+    "eslint-plugin-turbo": "^2.7.3",
     "geist": "^1.5.1",
-    "globals": "^16.5.0",
+    "globals": "^17.0.0",
     "postcss": "^8.5.6",
     "postcss-preset-mantine": "^1.18.0",
     "postcss-simple-vars": "^7.0.1",
     "prettier": "^3.7.4",
     "shapefile": "^0.6.6",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.46.4",
+    "typescript-eslint": "^8.52.0",
     "unzipper": "^0.12.3"
   },
   "packageManager": "pnpm@10.27.0"

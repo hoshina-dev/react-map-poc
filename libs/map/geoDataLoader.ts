@@ -32,6 +32,16 @@ export const mapDataLoader: GeoDataLoader = {
   async loadAdminBoundaries(
     parentCode: string,
   ): Promise<GeoJSONFeatureCollection | null> {
-    return loadAdminBoundariesAction(parentCode);
+    return loadAdminBoundariesAction(parentCode, 1);
+  },
+
+  /**
+   * Loads admin boundaries for a specific region (Level 2)
+   * @param parentCode - The ISO code of the parent region (e.g., "US", "DE")
+   */
+  async loadSubAdminBoundaries(
+    parentCode: string,
+  ): Promise<GeoJSONFeatureCollection | null> {
+    return loadAdminBoundariesAction(parentCode, 2);
   },
 };

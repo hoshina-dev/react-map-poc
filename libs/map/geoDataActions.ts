@@ -68,13 +68,14 @@ export async function loadWorldMapAction(): Promise<GeoJSONFeatureCollection> {
  */
 export async function loadAdminBoundariesAction(
   parentCode: string,
+  childLevel: number,
 ): Promise<GeoJSONFeatureCollection | null> {
   const client = getServerApolloClient();
 
   try {
     const { data } = await client.query<ChildrenByCodeQuery>({
       query: ChildrenByCodeDocument,
-      variables: { parentCode, childLevel: 1 },
+      variables: { parentCode, childLevel },
     });
 
     if (!data || !data.childrenByCode.length) {
